@@ -2,6 +2,7 @@
   "expo": {
     "name": "GlideApp",
     "slug": "GlideApp",
+    "scheme": "Glide",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -13,14 +14,40 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.glideapp.glide",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "Glide needs your location to find nearby rides.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "Glide needs your location to track rides in real-time.",
+        "NSCameraUsageDescription": "Upload photos of your driver's license for verification.",
+        "NSPhotoLibraryUsageDescription": "Select photos for your profile and verification."
+      }
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
+        "backgroundColor": "#2563eb"
       },
-      "edgeToEdgeEnabled": true
+      "package": "com.yourcompany.quickride",
+      "permissions": [
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "CAMERA",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE"
+      ]
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "The app needs access to your photos to upload license images."
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true
     },
     "web": {
       "favicon": "./assets/favicon.png"
