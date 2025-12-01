@@ -1,3 +1,25 @@
+// contexts/AuthContext.tsx - PRODUCTION GRADE (Authentication Only)
+/**
+ * Auth Context - Authentication State Management
+ * 
+ * RESPONSIBILITIES:
+ * - Authentication (sign in, sign up, sign out)
+ * - Auth state management (user object)
+ * - User profile state (READ-ONLY)
+ * - Email verification
+ * 
+ * DOES NOT HANDLE:
+ * - Profile updates (see useProfile hook)
+ * - Vehicle management (see useVehicle hook)
+ * - License operations (see useLicense hook)
+ * 
+ * WHY THIS SEPARATION:
+ * - Single Responsibility Principle
+ * - Easier to test
+ * - Easier to maintain
+ * - Better performance (fewer re-renders)
+ */
+
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import {
   User,
@@ -6,27 +28,43 @@ import {
   signOut as firebaseSignOut,
   onAuthStateChanged,
   sendPasswordResetEmail,
+  sendEmailVerification,
   GoogleAuthProvider,
   signInWithCredential,
   OAuthProvider,
 } from 'firebase/auth';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
-import { auth, db } from '../services/firebase';
+import { auth } from '../services/firebase';
+import { UserProfile } from '../types/user';
+import { getUserProfile, createUserProfile } from '../services/userService';
+import { 
+  logError, 
+  createStandardError,
+  ErrorSeverity 
+} from '../app/utils/ErrorHandler';
 import * as Google from 'expo-auth-session/providers/google';
 import * as AppleAuthentication from 'expo-apple-authentication';
-import { UserProfile } from '../types/user';
 
 interface AuthContextType {
+  // Auth state (read-only)
   user: User | null;
   userProfile: UserProfile | null;
   loading: boolean;
+  
+  // Auth status flags
+  needsEmailVerification: boolean;
+  needsOnboarding: boolean;
+  
+  // Auth methods
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string, displayName: string) => Promise<void>;
   signInWithGoogle: () => Promise<void>;
   signInWithApple: () => Promise<void>;
-  resetPassword: (email: string) => Promise<void>;
   signOut: () => Promise<void>;
-  updateUserProfile: (profile: Partial<UserProfile>) => Promise<void>;
+  resetPassword: (email: string) => Promise<void>;
+  sendVerificationEmail: () => Promise<void>;
+  
+  // Profile refresh (when updated externally)
+  refreshUserProfile: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -35,6 +73,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [needsEmailVerification, setNeedsEmailVerification] = useState(false);
+  const [needsOnboarding, setNeedsOnboarding] = useState(false);
 
   // Google Sign-In setup
   const [request, response, promptAsync] = Google.useAuthRequest({
@@ -42,16 +82,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     androidClientId: '70442870803-6oforsf4n5doba9do6pjlpg7a554g12j.apps.googleusercontent.com',
   });
 
-  // Listen to auth state changes
+  /**
+   * Listen to Firebase auth state changes
+   * This is the ONLY place where user state is set
+   */
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       setUser(user);
       
       if (user) {
-        // Fetch user profile from Firestore
-        await fetchUserProfile(user.uid);
+        // Check email verification for password provider
+        if (!user.emailVerified && user.providerData[0]?.providerId === 'password') {
+          setNeedsEmailVerification(true);
+          setNeedsOnboarding(false);
+          setUserProfile(null);
+        } else {
+          setNeedsEmailVerification(false);
+          await fetchUserProfile(user.uid);
+        }
       } else {
+        // User signed out
         setUserProfile(null);
+        setNeedsEmailVerification(false);
+        setNeedsOnboarding(false);
       }
       
       setLoading(false);
@@ -60,53 +113,129 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return unsubscribe;
   }, []);
 
-  // Fetch user profile from Firestore
-  const fetchUserProfile = async (uid: string) => {
+  /**
+   * Fetches user profile and determines onboarding status
+   * This is called automatically by onAuthStateChanged
+   * Can also be called manually via refreshUserProfile()
+   */
+  const fetchUserProfile = async (userId: string) => {
     try {
-      const profileDoc = await getDoc(doc(db, 'users', uid));
-      if (profileDoc.exists()) {
-        setUserProfile(profileDoc.data() as UserProfile);
+      const profile = await getUserProfile(userId);
+      
+      if (profile) {
+        setUserProfile(profile);
+        setNeedsOnboarding(!profile.onboardingCompleted);
+      } else {
+        // No profile exists - needs onboarding
+        setUserProfile(null);
+        setNeedsOnboarding(true);
+        
+        logError(new Error('User profile not found'), {
+          function: 'fetchUserProfile',
+          userId,
+          severity: ErrorSeverity.WARNING,
+          additionalInfo: { action: 'needs_onboarding' },
+        });
       }
     } catch (error) {
-      console.error('Error fetching user profile:', error);
+      logError(error, {
+        function: 'fetchUserProfile',
+        userId,
+        severity: ErrorSeverity.ERROR,
+      });
+      
+      setUserProfile(null);
+      setNeedsOnboarding(true);
     }
   };
 
-  // Email/Password Sign Up
+  /**
+   * Manually refresh user profile
+   * Called after profile updates from hooks
+   */
+  const refreshUserProfile = async () => {
+    if (user) {
+      await fetchUserProfile(user.uid);
+    }
+  };
+
+  /**
+   * Email/Password Sign Up
+   * Creates auth user + minimal profile
+   */
   const signUp = async (email: string, password: string, displayName: string) => {
     try {
       const credential = await createUserWithEmailAndPassword(auth, email, password);
       
-      // Create user profile in Firestore
-      const profile: UserProfile = {
-        uid: credential.user.uid,
-        email: email,
-        displayName: displayName,
-        isDriver: false,
+      // Send email verification
+      await sendEmailVerification(credential.user);
+      
+      // Create minimal profile
+      await createUserProfile(credential.user.uid, {
+        email,
+        displayName,
         rating: 5.0,
         totalRides: 0,
-        hasSeenAppGuide: false,
-      };
-
-      await setDoc(doc(db, 'users', credential.user.uid), profile);
-      setUserProfile(profile);
-    } catch (error: any) {
-      console.error('Sign up error:', error);
-      throw new Error(error.message);
+        totalRidesOffered: 0,
+        onboardingCompleted: false,
+      });
+      
+      console.log('✅ User created - email verification sent');
+    } catch (error) {
+      logError(error, {
+        function: 'signUp',
+        severity: ErrorSeverity.ERROR,
+        additionalInfo: { email },
+      });
+      
+      throw createStandardError(error);
     }
   };
 
-  // Email/Password Sign In
+  /**
+   * Send email verification to current user
+   */
+  const sendVerificationEmail = async () => {
+    const currentUser = auth.currentUser;
+    if (!currentUser) {
+      throw new Error('No user logged in');
+    }
+
+    try {
+      await sendEmailVerification(currentUser);
+      console.log('✅ Verification email sent');
+    } catch (error) {
+      logError(error, {
+        function: 'sendVerificationEmail',
+        userId: currentUser.uid,
+        severity: ErrorSeverity.WARNING,
+      });
+      
+      throw createStandardError(error);
+    }
+  };
+
+  /**
+   * Email/Password Sign In
+   */
   const signIn = async (email: string, password: string) => {
     try {
       await signInWithEmailAndPassword(auth, email, password);
-    } catch (error: any) {
-      console.error('Sign in error:', error);
-      throw new Error(error.message);
+      console.log('✅ User signed in');
+    } catch (error) {
+      logError(error, {
+        function: 'signIn',
+        severity: ErrorSeverity.WARNING,
+        additionalInfo: { email },
+      });
+      
+      throw createStandardError(error);
     }
   };
 
-  // Google Sign In
+  /**
+   * Google OAuth Sign In
+   */
   const signInWithGoogle = async () => {
     try {
       const result = await promptAsync();
@@ -116,29 +245,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const credential = GoogleAuthProvider.credential(id_token);
         const userCredential = await signInWithCredential(auth, credential);
         
-        // Check if user profile exists, create if not
-        const profileDoc = await getDoc(doc(db, 'users', userCredential.user.uid));
-        if (!profileDoc.exists()) {
-          const profile: UserProfile = {
-            uid: userCredential.user.uid,
+        // Check if profile exists
+        const existingProfile = await getUserProfile(userCredential.user.uid);
+        
+        if (!existingProfile) {
+          // First-time OAuth user - create profile
+          await createUserProfile(userCredential.user.uid, {
             email: userCredential.user.email!,
             displayName: userCredential.user.displayName || 'User',
             photoURL: userCredential.user.photoURL || undefined,
-            isDriver: false,
             rating: 5.0,
             totalRides: 0,
-            hasSeenAppGuide: false,
-          };
-          await setDoc(doc(db, 'users', userCredential.user.uid), profile);
+            totalRidesOffered: 0,
+            onboardingCompleted: false,
+          });
+          console.log('✅ Google sign in - new user');
+        } else {
+          console.log('✅ Google sign in - existing user');
         }
       }
-    } catch (error: any) {
-      console.error('Google sign in error:', error);
-      throw new Error(error.message);
+    } catch (error) {
+      logError(error, {
+        function: 'signInWithGoogle',
+        severity: ErrorSeverity.ERROR,
+      });
+      
+      throw createStandardError(error);
     }
   };
 
-  // Apple Sign In
+  /**
+   * Apple OAuth Sign In
+   */
   const signInWithApple = async () => {
     try {
       const credential = await AppleAuthentication.signInAsync({
@@ -156,58 +294,68 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       const userCredential = await signInWithCredential(auth, oauthCredential);
 
-      // Check if user profile exists, create if not
-      const profileDoc = await getDoc(doc(db, 'users', userCredential.user.uid));
-      if (!profileDoc.exists()) {
-        const profile: UserProfile = {
-          uid: userCredential.user.uid,
+      const existingProfile = await getUserProfile(userCredential.user.uid);
+      
+      if (!existingProfile) {
+        await createUserProfile(userCredential.user.uid, {
           email: userCredential.user.email || credential.email || '',
           displayName: credential.fullName?.givenName || 'User',
-          isDriver: false,
           rating: 5.0,
           totalRides: 0,
-          hasSeenAppGuide: false,
-        };
-        await setDoc(doc(db, 'users', userCredential.user.uid), profile);
+          totalRidesOffered: 0,
+          onboardingCompleted: false,
+        });
+        console.log('✅ Apple sign in - new user');
+      } else {
+        console.log('✅ Apple sign in - existing user');
       }
-    } catch (error: any) {
-      console.error('Apple sign in error:', error);
-      throw new Error(error.message);
+    } catch (error) {
+      logError(error, {
+        function: 'signInWithApple',
+        severity: ErrorSeverity.ERROR,
+      });
+      
+      throw createStandardError(error);
     }
   };
 
-  // Password Reset
+  /**
+   * Password Reset
+   */
   const resetPassword = async (email: string) => {
     try {
       await sendPasswordResetEmail(auth, email);
-    } catch (error: any) {
-      console.error('Password reset error:', error);
-      throw new Error(error.message);
+      console.log('✅ Password reset email sent');
+    } catch (error) {
+      logError(error, {
+        function: 'resetPassword',
+        severity: ErrorSeverity.WARNING,
+        additionalInfo: { email },
+      });
+      
+      throw createStandardError(error);
     }
   };
 
-  // Sign Out
+  /**
+   * Sign Out
+   */
   const signOut = async () => {
     try {
       await firebaseSignOut(auth);
       setUser(null);
       setUserProfile(null);
-    } catch (error: any) {
-      console.error('Sign out error:', error);
-      throw new Error(error.message);
-    }
-  };
-
-  // Update User Profile
-  const updateUserProfile = async (profile: Partial<UserProfile>) => {
-    if (!user) throw new Error('No user logged in');
-    
-    try {
-      await setDoc(doc(db, 'users', user.uid), profile, { merge: true });
-      setUserProfile(prev => prev ? { ...prev, ...profile } : null);
-    } catch (error: any) {
-      console.error('Update profile error:', error);
-      throw new Error(error.message);
+      setNeedsEmailVerification(false);
+      setNeedsOnboarding(false);
+      console.log('✅ User signed out');
+    } catch (error) {
+      logError(error, {
+        function: 'signOut',
+        userId: user?.uid,
+        severity: ErrorSeverity.ERROR,
+      });
+      
+      throw createStandardError(error);
     }
   };
 
@@ -217,13 +365,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         user,
         userProfile,
         loading,
+        needsEmailVerification,
+        needsOnboarding,
         signIn,
         signUp,
         signInWithGoogle,
         signInWithApple,
-        resetPassword,
         signOut,
-        updateUserProfile,
+        resetPassword,
+        sendVerificationEmail,
+        refreshUserProfile,
       }}
     >
       {children}

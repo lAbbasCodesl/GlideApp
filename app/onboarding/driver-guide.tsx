@@ -9,6 +9,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../contexts/AuthContext';
+import { useProfile } from '../../hooks';
 
 const driverRules = [
   {
@@ -50,7 +51,7 @@ const driverRules = [
 
 export default function DriverGuideScreen() {
   const router = useRouter();
-  const { updateUserProfile } = useAuth();
+  const { updateUserProfile } = useProfile();
   const [currentSlide, setCurrentSlide] = useState(0);
 
   const handleNext = () => {
