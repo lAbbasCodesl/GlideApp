@@ -1,23 +1,23 @@
-// contexts/AuthContext.tsx - PRODUCTION GRADE (Authentication Only)
+// contexts/AuthContext.tsx - FIXED VERSION
 /**
  * Auth Context - Authentication State Management
  * 
- * RESPONSIBILITIES:
- * - Authentication (sign in, sign up, sign out)
- * - Auth state management (user object)
- * - User profile state (READ-ONLY)
- * - Email verification
+ * RESPONSIBILITIES (Read this carefully!):
+ * ✅ Authentication (sign in, sign up, sign out)
+ * ✅ Auth state management (user object)
+ * ✅ User profile state (READ-ONLY)
+ * ✅ Email verification
  * 
  * DOES NOT HANDLE:
- * - Profile updates (see useProfile hook)
- * - Vehicle management (see useVehicle hook)
- * - License operations (see useLicense hook)
+ * ❌ Profile updates (use useProfile hook)
+ * ❌ Vehicle management (use useVehicle hook)
+ * ❌ License operations (use useLicense hook)
  * 
  * WHY THIS SEPARATION:
- * - Single Responsibility Principle
- * - Easier to test
- * - Easier to maintain
- * - Better performance (fewer re-renders)
+ * - Single Responsibility Principle: Each module does ONE thing
+ * - Easier to test: Mock just what you need
+ * - Easier to maintain: Changes isolated to one file
+ * - Better performance: Fewer unnecessary re-renders
  */
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
@@ -45,16 +45,22 @@ import * as Google from 'expo-auth-session/providers/google';
 import * as AppleAuthentication from 'expo-apple-authentication';
 
 interface AuthContextType {
-  // Auth state (read-only)
-  user: User | null;
-  userProfile: UserProfile | null;
-  loading: boolean;
+  // ============================================
+  // AUTH STATE (Read-Only)
+  // ============================================
+  user: User | null;              // Firebase User object
+  userProfile: UserProfile | null; // Firestore profile document
+  loading: boolean;                // True during initial auth check
   
-  // Auth status flags
-  needsEmailVerification: boolean;
-  needsOnboarding: boolean;
+  // ============================================
+  // STATUS FLAGS
+  // ============================================
+  needsEmailVerification: boolean; // Email not verified (password provider only)
+  needsOnboarding: boolean;        // Profile incomplete or doesn't exist
   
-  // Auth methods
+  // ============================================
+  // AUTH METHODS
+  // ============================================
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string, displayName: string) => Promise<void>;
   signInWithGoogle: () => Promise<void>;
@@ -63,7 +69,10 @@ interface AuthContextType {
   resetPassword: (email: string) => Promise<void>;
   sendVerificationEmail: () => Promise<void>;
   
-  // Profile refresh (when updated externally)
+  // ============================================
+  // PROFILE REFRESH
+  // Called by hooks after they update profile
+  // ============================================
   refreshUserProfile: () => Promise<void>;
 }
 
@@ -85,23 +94,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   /**
    * Listen to Firebase auth state changes
    * This is the ONLY place where user state is set
+   * 
+   * Flow:
+   * 1. Firebase detects auth change (sign in, sign out, token refresh)
+   * 2. We update user state
+   * 3. We fetch/update profile from Firestore
+   * 4. Navigation happens in _layout.tsx based on these states
    */
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      console.log('🔄 Auth state changed:', user ? user.email : 'signed out');
+      
       setUser(user);
       
       if (user) {
-        // Check email verification for password provider
-        if (!user.emailVerified && user.providerData[0]?.providerId === 'password') {
+        // User is signed in
+        
+        // Check if email is verified (only for password provider)
+        const isPasswordProvider = user.providerData[0]?.providerId === 'password';
+        const emailVerified = user.emailVerified;
+        
+        if (isPasswordProvider && !emailVerified) {
+          console.log('⚠️ Email not verified - blocking onboarding');
           setNeedsEmailVerification(true);
           setNeedsOnboarding(false);
+          // Still fetch profile so we can show user info
           await fetchUserProfile(user.uid);
         } else {
           setNeedsEmailVerification(false);
           await fetchUserProfile(user.uid);
         }
       } else {
-        // User signed out
+        // User signed out - clear everything
         setUserProfile(null);
         setNeedsEmailVerification(false);
         setNeedsOnboarding(false);
@@ -115,8 +139,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   /**
    * Fetches user profile and determines onboarding status
-   * This is called automatically by onAuthStateChanged
-   * Can also be called manually via refreshUserProfile()
+   * 
+   * Called automatically by:
+   * - onAuthStateChanged (on sign in, sign out, token refresh)
+   * - refreshUserProfile() (after profile updates from hooks)
+   * 
+   * Onboarding is complete when:
+   * - Profile exists in Firestore
+   * - onboardingCompleted = true
+   * - company field exists (required during onboarding)
+   * - phoneNumber field exists (required during onboarding)
    */
   const fetchUserProfile = async (userId: string) => {
     try {
@@ -124,9 +156,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       
       if (profile) {
         setUserProfile(profile);
-        setNeedsOnboarding(!profile.onboardingCompleted);
+        
+        // Check if onboarding is complete
+        // User might have profile but not finished onboarding
+        const isOnboardingComplete = 
+          profile.onboardingCompleted === true &&
+          !!profile.company &&
+          !!profile.phoneNumber;
+        
+        setNeedsOnboarding(!isOnboardingComplete);
+        
+        console.log('✅ Profile loaded:', {
+          hasProfile: true,
+          onboardingComplete: isOnboardingComplete,
+          hasCompany: !!profile.company,
+          hasPhone: !!profile.phoneNumber,
+        });
       } else {
         // No profile exists - needs onboarding
+        console.log('⚠️ No profile found - needs onboarding');
         setUserProfile(null);
         setNeedsOnboarding(true);
         
@@ -138,12 +186,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         });
       }
     } catch (error) {
+      console.error('❌ Error fetching profile:', error);
       logError(error, {
         function: 'fetchUserProfile',
         userId,
         severity: ErrorSeverity.ERROR,
       });
       
+      // On error, assume needs onboarding to be safe
       setUserProfile(null);
       setNeedsOnboarding(true);
     }
@@ -151,33 +201,51 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   /**
    * Manually refresh user profile
-   * Called after profile updates from hooks
+   * Called by hooks after profile updates
+   * 
+   * Example:
+   * const { updateProfile } = useProfile();
+   * await updateProfile({ company: 'New Company' });
+   * // useProfile calls refreshUserProfile() internally
    */
   const refreshUserProfile = async () => {
     if (user) {
+      console.log('🔄 Manually refreshing profile...');
       await fetchUserProfile(user.uid);
     }
   };
 
   /**
    * Email/Password Sign Up
-   * Creates auth user + minimal profile
+   * 
+   * Flow:
+   * 1. Create Firebase Auth user
+   * 2. Send email verification
+   * 3. Create minimal profile in Firestore
+   * 4. onAuthStateChanged detects new user
+   * 5. Navigation happens in _layout.tsx
+   * 
+   * IMPORTANT: Profile is created with onboardingCompleted=false
+   * User must complete onboarding before accessing app
    */
   const signUp = async (email: string, password: string, displayName: string) => {
     try {
+      console.log('📝 Creating user account...');
       const credential = await createUserWithEmailAndPassword(auth, email, password);
       
       // Send email verification
+      console.log('📧 Sending verification email...');
       await sendEmailVerification(credential.user);
       
       // Create minimal profile
+      console.log('💾 Creating user profile...');
       await createUserProfile(credential.user.uid, {
         email,
         displayName,
         rating: 5.0,
         totalRides: 0,
         totalRidesOffered: 0,
-        onboardingCompleted: false,
+        onboardingCompleted: false, // 🔴 CRITICAL: Must complete onboarding
       });
       
       console.log('✅ User created - email verification sent');
@@ -257,7 +325,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             rating: 5.0,
             totalRides: 0,
             totalRidesOffered: 0,
-            onboardingCompleted: false,
+            onboardingCompleted: false, // 🔴 Must complete onboarding
           });
           console.log('✅ Google sign in - new user');
         } else {
@@ -303,7 +371,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           rating: 5.0,
           totalRides: 0,
           totalRidesOffered: 0,
-          onboardingCompleted: false,
+          onboardingCompleted: false, // 🔴 Must complete onboarding
         });
         console.log('✅ Apple sign in - new user');
       } else {

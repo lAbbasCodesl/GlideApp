@@ -1,11 +1,11 @@
-// mobile-app/app/_layout.tsx
+// app/_layout.tsx - WITH COMPLETE ONBOARDING ROUTING
 import { Slot, useRouter, useSegments } from 'expo-router';
 import { useEffect } from 'react';
 import { AuthProvider, useAuth } from '../contexts/AuthContext';
-import { View, ActivityIndicator } from 'react-native';
+import { View, ActivityIndicator, StyleSheet } from 'react-native';
 
 function RootLayoutNav() {
-  const { user, loading } = useAuth();
+  const { user, userProfile, loading, needsEmailVerification, needsOnboarding } = useAuth();
   const segments = useSegments();
   const router = useRouter();
 
@@ -13,20 +13,59 @@ function RootLayoutNav() {
     if (loading) return;
 
     const inAuthGroup = segments[0] === '(auth)';
+    const inOnboardingGroup = segments[0] === 'onboarding';
+    const inMainApp = segments[0] === '(tabs)';
 
+    console.log('🔍 Navigation Check:', {
+      user: !!user,
+      emailVerified: user?.emailVerified,
+      needsEmailVerification,
+      needsOnboarding,
+      onboardingCompleted: userProfile?.onboardingCompleted,
+      currentPath: segments.join('/'),
+    });
+
+    // Case 1: No user → sign in
     if (!user && !inAuthGroup) {
-      // Redirect to sign-in if not authenticated
-      console.log('Redirecting to sign-in');
+      console.log('➡️ Redirecting to sign-in (no user)');
       router.replace('/(auth)/sign-in');
-    } else if (user && inAuthGroup) {
-      // Redirect to home if authenticated
-      router.replace('/(tabs)/home');
+      return;
     }
-  }, [user, loading, segments]);
 
+    // Case 2: User exists but needs email verification
+    if (user && needsEmailVerification && segments[0] !== 'onboarding') {
+      console.log('➡️ Redirecting to email verification');
+      router.replace('/onboarding/email-verification');
+      return;
+    }
+
+    // Case 3: User verified but needs onboarding
+    if (user && !needsEmailVerification && needsOnboarding && !inOnboardingGroup) {
+      console.log('➡️ Redirecting to onboarding');
+      router.replace('/onboarding/personal-info');
+      return;
+    }
+
+    // Case 4: User authenticated and onboarded, but still in auth screens
+    if (user && !needsEmailVerification && !needsOnboarding && inAuthGroup) {
+      console.log('➡️ Redirecting to home (already authenticated)');
+      router.replace('/(tabs)/home');
+      return;
+    }
+
+    // Case 5: User authenticated and onboarded, redirect from onboarding to app
+    if (user && !needsEmailVerification && !needsOnboarding && inOnboardingGroup) {
+      console.log('➡️ Redirecting to home (onboarding complete)');
+      router.replace('/(tabs)/home');
+      return;
+    }
+
+  }, [user, userProfile, loading, needsEmailVerification, needsOnboarding, segments]);
+
+  // Show loading spinner while checking auth state
   if (loading) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+      <View style={styles.centerContainer}>
         <ActivityIndicator size="large" color="#2563eb" />
       </View>
     );
@@ -36,10 +75,18 @@ function RootLayoutNav() {
 }
 
 export default function RootLayout() {
-
   return (
     <AuthProvider>
       <RootLayoutNav />
     </AuthProvider>
   );
 }
+
+const styles = StyleSheet.create({
+  centerContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+  },
+});
