@@ -95,7 +95,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (!user.emailVerified && user.providerData[0]?.providerId === 'password') {
           setNeedsEmailVerification(true);
           setNeedsOnboarding(false);
-          setUserProfile(null);
+          await fetchUserProfile(user.uid);
         } else {
           setNeedsEmailVerification(false);
           await fetchUserProfile(user.uid);
