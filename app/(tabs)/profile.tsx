@@ -130,7 +130,16 @@ export default function ProfileScreen() {
           <Text style={styles.menuText}>Privacy & Security</Text>
           <Ionicons name="chevron-forward" size={20} color="#d1d5db" />
         </TouchableOpacity>
-
+        <TouchableOpacity
+          style={styles.menuItem}
+          onPress={() => router.push('/settings/saved-locations')}
+        > 
+          <View style={styles.menuIconContainer}>
+            <Ionicons name="location-outline" size={20} color="#5582daff" />
+          </View>
+          <Text style={styles.menuText}>Saved Locations</Text>
+          <Ionicons name="chevron-forward" size={20} color="#d1d5db" />
+        </TouchableOpacity>
         <TouchableOpacity
           style={styles.menuItem}
           onPress={() => router.push('/settings/help')}
