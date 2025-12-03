@@ -105,45 +105,6 @@ export default function ProfileScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* Driver Section */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Driver</Text>
-        
-        {userProfile?.isDriver ? (
-          <>
-            <TouchableOpacity
-              style={styles.menuItem}
-              onPress={() => router.push('/driver/setup')}
-            >
-              <View style={styles.menuIconContainer}>
-                <Ionicons name="car-sport-outline" size={20} color="#8b5cf6" />
-              </View>
-              <Text style={styles.menuText}>Vehicle Details</Text>
-              <Ionicons name="chevron-forward" size={20} color="#d1d5db" />
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.menuItem}
-              onPress={() => router.push('/driver/earnings')}
-            >
-              <View style={styles.menuIconContainer}>
-                <Ionicons name="cash-outline" size={20} color="#10b981" />
-              </View>
-              <Text style={styles.menuText}>Earnings</Text>
-              <Ionicons name="chevron-forward" size={20} color="#d1d5db" />
-            </TouchableOpacity>
-          </>
-        ) : (
-          <TouchableOpacity
-            style={styles.becomeDriverButton}
-            onPress={() => router.push('/driver/setup')}
-          >
-            <Ionicons name="car-outline" size={24} color="#fff" />
-            <Text style={styles.becomeDriverText}>Become a Driver</Text>
-          </TouchableOpacity>
-        )}
-      </View>
-
       {/* Settings */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Settings</Text>

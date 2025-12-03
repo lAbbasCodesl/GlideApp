@@ -9,6 +9,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../contexts/AuthContext';
+import { useProfile } from '../../hooks';
 
 const etiquetteRules = [
   {
@@ -50,7 +51,7 @@ const etiquetteRules = [
 
 export default function RiderGuideScreen() {
   const router = useRouter();
-  const { updateUserProfile } = useAuth();
+  const { updateProfile } = useProfile();
   const [currentSlide, setCurrentSlide] = useState(0);
 
   const handleNext = () => {
@@ -62,7 +63,7 @@ export default function RiderGuideScreen() {
   };
 
   const handleFinish = async () => {
-    await updateUserProfile({ hasSeenRiderGuide: true });
+    await updateProfile({ hasSeenRiderGuide: true });
     router.back();
   };
 

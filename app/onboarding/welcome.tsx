@@ -12,6 +12,7 @@ import {
   TouchableOpacity,
   StyleSheet,
   ActivityIndicator,
+  ScrollView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -77,7 +78,7 @@ export default function Welcome() {
         <Text style={styles.progressText}>Step 3 of 3</Text>
       </View>
 
-      <View style={styles.content}>
+      <ScrollView style={styles.content}>
         {/* Success Icon */}
         <View style={styles.iconContainer}>
           <View style={styles.iconCircle}>
@@ -96,7 +97,7 @@ export default function Welcome() {
         </View>
 
         {/* What's Next Section */}
-        <View style={styles.section}>
+        {/* <View style={styles.section}>
           <Text style={styles.sectionTitle}>What you can do now:</Text>
           
           <View style={styles.featureList}>
@@ -130,7 +131,7 @@ export default function Welcome() {
               </View>
             </View>
           </View>
-        </View>
+        </View> */}
 
         {/* Vehicle Prompt */}
         <View style={styles.vehiclePrompt}>
@@ -142,9 +143,8 @@ export default function Welcome() {
             Add your vehicle to start offering rides to others. You can do this now or anytime from your profile.
           </Text>
         </View>
-      </View>
 
-      {/* Footer */}
+              {/* Footer */}
       <View style={styles.footer}>
         <TouchableOpacity
           style={[styles.vehicleButton, isLoading && styles.buttonDisabled]}
@@ -176,6 +176,9 @@ export default function Welcome() {
           )}
         </TouchableOpacity>
       </View>
+      </ScrollView>
+
+
     </SafeAreaView>
   );
 }

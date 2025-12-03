@@ -140,7 +140,6 @@ export function getUserFriendlyMessage(error: unknown): string {
 export function logError(error: unknown, context: ErrorLogContext): void {
   const timestamp = new Date().toISOString();
   const severity = context.severity || ErrorSeverity.ERROR;
-  
   const errorLog = {
     timestamp,
     severity,
@@ -163,9 +162,8 @@ export function logError(error: unknown, context: ErrorLogContext): void {
     [ErrorSeverity.ERROR]: '❌',
     [ErrorSeverity.CRITICAL]: '🚨',
   }[severity];
-  
-  console.error(`${emoji} Error Log:`, JSON.stringify(errorLog, null, 2));
-  
+    console.error(`${emoji} Error Log:`);
+    console.log('Error details:', errorLog);  
   // Production: Send to external service
   // TODO: Uncomment when setting up error tracking service
   // if (__DEV__) {

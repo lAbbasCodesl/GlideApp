@@ -165,7 +165,7 @@ export default function ProfileEditScreen() {
             <Text style={styles.sectionTitle}>Vehicle</Text>
             {hasVehicle && (
               <TouchableOpacity 
-                onPress={() => router.push('/vehicle/edit')}
+                onPress={() => router.push('/vehicle/add')}
                 disabled={loading}
               >
                 <Text style={styles.editLink}>Edit</Text>
@@ -203,7 +203,7 @@ export default function ProfileEditScreen() {
             <Text style={styles.sectionTitle}>Driver's License</Text>
             {license && (
               <TouchableOpacity 
-                onPress={() => router.push('/license/edit')}
+                onPress={() => router.push('/license/add')}
                 disabled={loading}
               >
                 <Text style={styles.editLink}>Update</Text>

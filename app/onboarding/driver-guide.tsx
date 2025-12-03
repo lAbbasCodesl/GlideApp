@@ -51,7 +51,7 @@ const driverRules = [
 
 export default function DriverGuideScreen() {
   const router = useRouter();
-  const { updateUserProfile } = useProfile();
+  const { updateProfile } = useProfile();
   const [currentSlide, setCurrentSlide] = useState(0);
 
   const handleNext = () => {
@@ -63,7 +63,7 @@ export default function DriverGuideScreen() {
   };
 
   const handleFinish = async () => {
-    await updateUserProfile({ hasSeenDriverGuide: true });
+    await updateProfile({ hasSeenDriverGuide: true });
     router.back();
   };
 
