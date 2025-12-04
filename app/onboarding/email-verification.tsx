@@ -22,7 +22,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { logError, ErrorSeverity } from '../utils/ErrorHandler';
 
 export default function EmailVerification() {
-  const { user, sendVerificationEmail, signOut } = useAuth();
+  const { user, sendVerificationEmail,setNeedsEmailVerification, signOut } = useAuth();
   const router = useRouter();
   
   const [loading, setLoading] = useState(false);
@@ -46,9 +46,9 @@ export default function EmailVerification() {
     try {
       // Reload user to get latest data from Firebase
       await user?.reload();
-      console.log(user)
       if (user?.emailVerified) {
         Alert.alert('Success!', 'Your email has been verified');
+        setNeedsEmailVerification(false);
         // Navigation will be handled by root layout
         router.replace('/onboarding/personal-info');
       } else {

@@ -262,7 +262,7 @@ export default function HomeScreen() {
       </View>
 
       {/* Driver Requirements Banner */}
-      {selectedMode === 'offer' && (
+      {selectedMode === 'offer' && userProfile.license.verificationStatus !== 'approved' && (
         <View style={styles.requirementsBanner}>
           {!userProfile?.vehicle || !userProfile?.license ? (
             <>
@@ -306,16 +306,6 @@ export default function HomeScreen() {
                 <Text style={styles.requirementsTitle}>Verification Pending</Text>
                 <Text style={styles.requirementsText}>
                   Your license is being verified. You can create rides now, but riders may prefer verified drivers.
-                </Text>
-              </View>
-            </>
-          ) : userProfile.license.verificationStatus === 'approved' ? (
-            <>
-              <Ionicons name="checkmark-circle" size={24} color="#10b981" />
-              <View style={styles.requirementsContent}>
-                <Text style={styles.requirementsTitle}>Ready to Drive!</Text>
-                <Text style={styles.requirementsText}>
-                  You're all set to offer rides. Your license is verified.
                 </Text>
               </View>
             </>

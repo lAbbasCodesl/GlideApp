@@ -15,7 +15,6 @@ import { useAuth } from '../../contexts/AuthContext';
 import { Ionicons } from '@expo/vector-icons';
 
 export default function SigningUpScreen() {
-  const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -26,7 +25,7 @@ export default function SigningUpScreen() {
   const router = useRouter();
 
   const handleSignUp = async () => {
-    if (!name || !email || !password || !confirmPassword) {
+    if (!email || !password || !confirmPassword) {
       Alert.alert('Error', 'Please fill in all fields');
       return;
     }
@@ -43,7 +42,7 @@ export default function SigningUpScreen() {
 
     setLoading(true);
     try {
-      await signUp(email, password, name);
+      await signUp(email, password);
       // Navigation handled by root layout
     } catch (error: any) {
       Alert.alert('Sign Up Failed', error.message);
@@ -87,17 +86,6 @@ return (
 
         <View style={styles.form}>
           <View style={styles.inputContainer}>
-            <Ionicons name="person-outline" size={20} color="#6b7280" style={styles.inputIcon} />
-            <TextInput
-              style={styles.input}
-              placeholder="Full Name"
-              value={name}
-              onChangeText={setName}
-              editable={!loading}
-            />
-          </View>
-
-          <View style={styles.inputContainer}>
             <Ionicons name="mail-outline" size={20} color="#6b7280" style={styles.inputIcon} />
             <TextInput
               style={styles.input}
@@ -119,6 +107,7 @@ return (
               onChangeText={setPassword}
               secureTextEntry={!showPassword}
               editable={!loading}
+              textContentType="oneTimeCode"
             />
             <TouchableOpacity
               onPress={() => setShowPassword(!showPassword)}
@@ -141,6 +130,7 @@ return (
               onChangeText={setConfirmPassword}
               secureTextEntry={!showPassword}
               editable={!loading}
+              textContentType="oneTimeCode"
             />
           </View>
 

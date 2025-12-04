@@ -62,7 +62,7 @@ interface AuthContextType {
   // AUTH METHODS
   // ============================================
   signIn: (email: string, password: string) => Promise<void>;
-  signUp: (email: string, password: string, displayName: string) => Promise<void>;
+  signUp: (email: string, password: string) => Promise<void>;
   signInWithGoogle: () => Promise<void>;
   signInWithApple: () => Promise<void>;
   signOut: () => Promise<void>;
@@ -74,6 +74,7 @@ interface AuthContextType {
   // Called by hooks after they update profile
   // ============================================
   refreshUserProfile: () => Promise<void>;
+  setNeedsEmailVerification: (value: boolean) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -228,7 +229,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
    * IMPORTANT: Profile is created with onboardingCompleted=false
    * User must complete onboarding before accessing app
    */
-  const signUp = async (email: string, password: string, displayName: string) => {
+  const signUp = async (email: string, password: string) => {
     try {
       console.log('📝 Creating user account...');
       const credential = await createUserWithEmailAndPassword(auth, email, password);
@@ -241,7 +242,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       console.log('💾 Creating user profile...');
       await createUserProfile(credential.user.uid, {
         email,
-        displayName,
+        displayName: '',
         rating: 5.0,
         totalRides: 0,
         totalRidesOffered: 0,
@@ -443,6 +444,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         resetPassword,
         sendVerificationEmail,
         refreshUserProfile,
+        setNeedsEmailVerification
       }}
     >
       {children}

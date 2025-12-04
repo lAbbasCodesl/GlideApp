@@ -162,7 +162,7 @@ export function logError(error: unknown, context: ErrorLogContext): void {
     [ErrorSeverity.ERROR]: '❌',
     [ErrorSeverity.CRITICAL]: '🚨',
   }[severity];
-    console.error(`${emoji} Error Log:`);
+    console.log(`${emoji} Error Log:`);
     console.log('Error details:', errorLog);  
   // Production: Send to external service
   // TODO: Uncomment when setting up error tracking service
