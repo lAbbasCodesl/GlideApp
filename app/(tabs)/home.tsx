@@ -88,13 +88,7 @@ const handleSearch = () => {
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Add Payment Method',
-          onPress: () => router.push({
-            pathname: '/payment/setup',
-            params: { 
-              required: 'true',
-              returnTo: '/(tabs)/home',
-            },
-          }),
+          onPress: () => router.push('/payment/setup'),
         },
       ]
     );

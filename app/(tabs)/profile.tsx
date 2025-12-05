@@ -92,17 +92,17 @@ export default function ProfileScreen() {
           <Text style={styles.menuText}>My Rides</Text>
           <Ionicons name="chevron-forward" size={20} color="#d1d5db" />
         </TouchableOpacity>
-
-        <TouchableOpacity
+                <TouchableOpacity
           style={styles.menuItem}
-          onPress={() => router.push('/payment/history')}
+          onPress={() => router.push('/payment/setup')}
         >
           <View style={styles.menuIconContainer}>
-            <Ionicons name="wallet-outline" size={20} color="#f59e0b" />
+            <Ionicons name="wallet-outline" size={20} color="#ef4444" />
           </View>
-          <Text style={styles.menuText}>Payment History</Text>
+          <Text style={styles.menuText}>Payment Methods</Text>
           <Ionicons name="chevron-forward" size={20} color="#d1d5db" />
         </TouchableOpacity>
+
       </View>
 
       {/* Settings */}
@@ -120,16 +120,7 @@ export default function ProfileScreen() {
           <Ionicons name="chevron-forward" size={20} color="#d1d5db" />
         </TouchableOpacity>
 
-        <TouchableOpacity
-          style={styles.menuItem}
-          onPress={() => router.push('/payment/setup')}
-        >
-          <View style={styles.menuIconContainer}>
-            <Ionicons name="lock-closed-outline" size={20} color="#ef4444" />
-          </View>
-          <Text style={styles.menuText}>Payment Methods</Text>
-          <Ionicons name="chevron-forward" size={20} color="#d1d5db" />
-        </TouchableOpacity>
+
         <TouchableOpacity
           style={styles.menuItem}
           onPress={() => router.push('/settings/saved-locations')}

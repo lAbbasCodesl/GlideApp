@@ -231,9 +231,8 @@ export const hasPaymentMethod = (paymentMethods?: PaymentMethods): boolean => {
  */
 export const isValidVenmoHandle = (handle: string): boolean => {
   // Should start with @ and be 5-30 characters
-  const cleaned = handle.trim();
-  if (!cleaned.startsWith('@')) return false;
-  const username = cleaned.slice(1);
+  const username = handle.trim();
+
   return username.length >= 4 && username.length <= 30 && /^[a-zA-Z0-9_-]+$/.test(username);
 };
 
@@ -242,9 +241,7 @@ export const isValidVenmoHandle = (handle: string): boolean => {
  */
 export const isValidCashappHandle = (handle: string): boolean => {
   // Should start with $ and be 5-30 characters
-  const cleaned = handle.trim();
-  if (!cleaned.startsWith('$')) return false;
-  const username = cleaned.slice(1);
+  const username = handle.trim();
   return username.length >= 4 && username.length <= 30 && /^[a-zA-Z0-9_-]+$/.test(username);
 };
 

@@ -73,7 +73,7 @@ export default function PaymentSetupScreen() {
     if (hasVenmo && !isValidVenmoHandle(venmoHandle)) {
       Alert.alert(
         'Invalid Venmo Handle',
-        'Venmo handle should start with @ and be 5-30 characters (letters, numbers, hyphens, underscores only)'
+        'Venmo handle should be 5-30 characters (letters, numbers, hyphens, underscores only)'
       );
       return;
     }
@@ -82,7 +82,7 @@ export default function PaymentSetupScreen() {
     if (hasCashapp && !isValidCashappHandle(cashappHandle)) {
       Alert.alert(
         'Invalid Cash App Handle',
-        'Cash App handle should start with $ and be 5-30 characters (letters, numbers, hyphens, underscores only)'
+        'Cash App handle should be 5-30 characters (letters, numbers, hyphens, underscores only)'
       );
       return;
     }
@@ -90,8 +90,8 @@ export default function PaymentSetupScreen() {
     try {
       await updateProfile({
         paymentMethods: {
-          venmo: hasVenmo ? formatVenmoHandle(venmoHandle) : undefined,
-          cashapp: hasCashapp ? formatCashappHandle(cashappHandle) : undefined,
+          venmo: hasVenmo ? formatVenmoHandle(venmoHandle) : null,
+          cashapp: hasCashapp ? formatCashappHandle(cashappHandle) : null,
           acceptsCash,
         },
       });
@@ -151,69 +151,89 @@ export default function PaymentSetupScreen() {
           </View>
         )}
 
-        {/* Venmo */}
-        <View style={styles.section}>
-          <View style={styles.methodHeader}>
-            <View style={styles.methodIcon}>
-              <Text style={styles.methodIconText}>V</Text>
-            </View>
-            <View style={styles.methodHeaderContent}>
-              <Text style={styles.methodTitle}>Venmo</Text>
-              <Text style={styles.methodSubtitle}>Add your @username</Text>
-            </View>
-          </View>
+       {/* Venmo */}
+<View style={styles.section}>
+  <View style={styles.methodHeader}>
+    <View style={styles.methodIcon}>
+      <Text style={styles.methodIconText}>V</Text>
+    </View>
+    <View style={styles.methodHeaderContent}>
+      <Text style={styles.methodTitle}>Venmo</Text>
+      <Text style={styles.methodSubtitle}>Add your @username</Text>
+    </View>
+  </View>
 
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Venmo Handle (Optional)</Text>
-            <View style={styles.inputContainer}>
-              <Text style={styles.inputPrefix}>@</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="username"
-                value={venmoHandle.replace('@', '')}
-                onChangeText={(text) => setVenmoHandle(text.replace('@', ''))}
-                autoCapitalize="none"
-                autoCorrect={false}
-                editable={!loading}
-              />
-            </View>
-            <Text style={styles.hint}>
-              e.g., @john-smith or @johnsmith123
-            </Text>
-          </View>
-        </View>
+  <View style={styles.inputGroup}>
+    <Text style={styles.label}>Venmo Handle (Optional)</Text>
 
-        {/* Cash App */}
-        <View style={styles.section}>
-          <View style={styles.methodHeader}>
-            <View style={[styles.methodIcon, styles.cashappIcon]}>
-              <Text style={styles.methodIconText}>$</Text>
-            </View>
-            <View style={styles.methodHeaderContent}>
-              <Text style={styles.methodTitle}>Cash App</Text>
-              <Text style={styles.methodSubtitle}>Add your $cashtag</Text>
-            </View>
-          </View>
+    {/* Input */}
+    <View style={styles.inputContainer}>
+      <Text style={styles.inputPrefix}>@</Text>
+      <TextInput
+        style={styles.input}
+        placeholder="username"
+        value={venmoHandle}
+        onChangeText={(text) => {
+          // Remove any accidental @ or $
+          const clean = text.replace(/[@$]/g, '');
+          setVenmoHandle(clean);
+        }}
+        autoCapitalize="none"
+        autoCorrect={false}
+        editable={!loading}
+      />
+    </View>
 
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Cash App Handle (Optional)</Text>
-            <View style={styles.inputContainer}>
-              <Text style={styles.inputPrefix}>$</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="username"
-                value={cashappHandle.replace('$', '')}
-                onChangeText={(text) => setCashappHandle(text.replace('$', ''))}
-                autoCapitalize="none"
-                autoCorrect={false}
-                editable={!loading}
-              />
-            </View>
-            <Text style={styles.hint}>
-              e.g., $johnsmith or $john-smith
-            </Text>
-          </View>
-        </View>
+    {/* Dynamic Preview */}
+    {venmoHandle.length > 0 && (
+      <Text style={styles.hint}>Your tag: @{venmoHandle}</Text>
+    )}
+
+    {/* Default hint if empty */}
+    {venmoHandle.length === 0 && (
+      <Text style={styles.hint}>e.g., @john-smith or @johnsmith123</Text>
+    )}
+  </View>
+</View>
+
+{/* Cash App */}
+<View style={styles.section}>
+  <View style={styles.methodHeader}>
+    <View style={[styles.methodIcon, styles.cashappIcon]}>
+      <Text style={styles.methodIconText}>$</Text>
+    </View>
+    <View style={styles.methodHeaderContent}>
+      <Text style={styles.methodTitle}>Cash App</Text>
+      <Text style={styles.methodSubtitle}>Add your $cashtag</Text>
+    </View>
+  </View>
+
+  <View style={styles.inputGroup}>
+    <Text style={styles.label}>Cash App Handle (Optional)</Text>
+
+    <View style={styles.inputContainer}>
+      <Text style={styles.inputPrefix}>$</Text>
+
+      <TextInput
+        style={styles.input}
+        placeholder="username"
+        value={cashappHandle.replace('$', '')}
+        onChangeText={(text) => setCashappHandle(text.replace('$', ''))}
+        autoCapitalize="none"
+        autoCorrect={false}
+        editable={!loading}
+      />
+    </View>
+
+    {/* Dynamic Example */}
+    <Text style={styles.hint}>
+      {cashappHandle.trim().length > 0
+        ? `Your tag: $${cashappHandle.replace('$', '')}`
+        : 'e.g., $johnsmith or $john-smith'}
+    </Text>
+  </View>
+</View>
+
 
         {/* Cash */}
         <View style={styles.section}>
