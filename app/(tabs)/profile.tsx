@@ -122,12 +122,12 @@ export default function ProfileScreen() {
 
         <TouchableOpacity
           style={styles.menuItem}
-          onPress={() => router.push('/settings/privacy')}
+          onPress={() => router.push('/payment/setup')}
         >
           <View style={styles.menuIconContainer}>
             <Ionicons name="lock-closed-outline" size={20} color="#ef4444" />
           </View>
-          <Text style={styles.menuText}>Privacy & Security</Text>
+          <Text style={styles.menuText}>Payment Methods</Text>
           <Ionicons name="chevron-forward" size={20} color="#d1d5db" />
         </TouchableOpacity>
         <TouchableOpacity

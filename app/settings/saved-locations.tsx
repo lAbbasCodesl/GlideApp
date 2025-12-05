@@ -1,13 +1,10 @@
-// app/settings/saved-locations.tsx
+// app/settings/saved-locations.tsx - FIXED VERSION
 /**
- * Saved Locations Management Screen
+ * Saved Locations Management Screen - KEYBOARD FIX
  * 
- * Allows users to:
- * - View saved locations (Home, Work, etc.)
- * - Add new saved locations
- * - Edit existing locations
- * - Delete locations
- * - View recent locations
+ * Fixed:
+ * - Modal keyboard handling with KeyboardAvoidingView
+ * - Proper modal positioning above keyboard
  */
 
 import React, { useState, useEffect } from 'react';
@@ -20,6 +17,9 @@ import {
   Alert,
   TextInput,
   Modal,
+  KeyboardAvoidingView,
+  Platform,
+  Keyboard,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -114,10 +114,63 @@ export default function SavedLocationsScreen() {
     setNewLocationName('');
     setNewLocationType('custom');
     setShowAddModal(true);
-    
-    // Store in temporary state to use after modal input
-    // In real app, you'd handle this better
+    // TODO: Store the location data to save after user enters name
   };
+
+  /**
+   * Save the new location
+   */
+  const handleSaveLocation = async () => {
+    if (!newLocationName.trim()) {
+      Alert.alert('Name Required', 'Please enter a name for this location');
+      return;
+    }
+
+    // For now, show message that this is a placeholder
+    // In real app, you'd need to get actual coordinates from address selection
+    Alert.alert(
+      'Feature Coming Soon',
+      'To save a location:\n\n1. Go to Home screen\n2. Search for your location using the address picker\n3. The location will automatically be saved to Recent\n4. Then come here to give it a name\n\nFor now, this just demonstrates the UI flow.',
+      [
+        {
+          text: 'Got It',
+          onPress: () => {
+            setShowAddModal(false);
+            setNewLocationName('');
+            setNewLocationType('custom');
+          },
+        },
+      ]
+    );
+
+    // TODO: Real implementation would be:
+    // try {
+    //   await saveLocation(
+    //     newLocationName.trim(),
+    //     selectedAddress,
+    //     selectedLat,
+    //     selectedLng,
+    //     newLocationType
+    //   );
+    //   await loadLocations();
+    //   setShowAddModal(false);
+    //   setNewLocationName('');
+    // } catch (error) {
+    //   Alert.alert('Error', 'Failed to save location');
+    // }
+  };
+
+  // Close modal when keyboard dismisses
+  useEffect(() => {
+    const keyboardDidHide = Keyboard.addListener('keyboardDidHide', () => {
+      // Optional: Don't auto-close modal when keyboard hides
+      // This is personal preference
+    });
+
+    return () => {
+      keyboardDidHide.remove();
+    };
+  }, []);
 
   const getLocationIcon = (type?: 'home' | 'work' | 'custom') => {
     switch (type) {
@@ -236,23 +289,43 @@ export default function SavedLocationsScreen() {
         )}
       </ScrollView>
 
-      {/* Add Location Modal */}
+      {/* Add Location Modal - WITH KEYBOARD FIX */}
       <Modal
         visible={showAddModal}
         transparent
         animationType="slide"
         onRequestClose={() => setShowAddModal(false)}
       >
-        <View style={styles.modalOverlay}>
+        <KeyboardAvoidingView 
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.modalOverlay}
+          keyboardVerticalOffset={0}
+        >
+          <TouchableOpacity 
+            style={styles.modalBackdrop}
+            activeOpacity={1}
+            onPress={() => {
+              Keyboard.dismiss();
+              setShowAddModal(false);
+            }}
+          />
+          
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Add Saved Location</Text>
-              <TouchableOpacity onPress={() => setShowAddModal(false)}>
+              <TouchableOpacity onPress={() => {
+                Keyboard.dismiss();
+                setShowAddModal(false);
+              }}>
                 <Ionicons name="close" size={24} color="#111827" />
               </TouchableOpacity>
             </View>
 
-            <View style={styles.modalBody}>
+            <ScrollView 
+              style={styles.modalBody}
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
+            >
               <Text style={styles.modalNote}>
                 To add a location, first search for it in the address selection screen, then come back here to save it with a name.
               </Text>
@@ -264,6 +337,7 @@ export default function SavedLocationsScreen() {
                   placeholder="e.g., Home, Work, Gym"
                   value={newLocationName}
                   onChangeText={setNewLocationName}
+                  autoFocus={false}
                 />
               </View>
 
@@ -334,9 +408,21 @@ export default function SavedLocationsScreen() {
                   </Text>
                 </TouchableOpacity>
               </View>
-            </View>
+
+              {/* Save Button */}
+              <TouchableOpacity
+                style={[
+                  styles.saveLocationButton,
+                  !newLocationName.trim() && styles.saveLocationButtonDisabled,
+                ]}
+                onPress={handleSaveLocation}
+                disabled={!newLocationName.trim()}
+              >
+                <Text style={styles.saveLocationButtonText}>Save Location</Text>
+              </TouchableOpacity>
+            </ScrollView>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
     </SafeAreaView>
   );
@@ -483,8 +569,11 @@ const styles = StyleSheet.create({
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'flex-end',
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
   },
   modalContent: {
     backgroundColor: '#fff',
@@ -560,6 +649,21 @@ const styles = StyleSheet.create({
     color: '#6b7280',
   },
   typeButtonTextActive: {
+    color: '#fff',
+  },
+  saveLocationButton: {
+    backgroundColor: '#2563eb',
+    padding: 16,
+    borderRadius: 12,
+    alignItems: 'center',
+    marginTop: 24,
+  },
+  saveLocationButtonDisabled: {
+    backgroundColor: '#d1d5db',
+  },
+  saveLocationButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
     color: '#fff',
   },
 });

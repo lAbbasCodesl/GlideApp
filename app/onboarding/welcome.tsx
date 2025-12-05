@@ -1,8 +1,11 @@
-// app/onboarding/welcome.tsx
+// app/onboarding/welcome.tsx - SIMPLIFIED
 /**
  * Onboarding Step 3/3: Welcome & Vehicle Prompt
  * 
- * Completes onboarding and optionally prompts vehicle setup
+ * SIMPLIFIED:
+ * - Complete onboarding when user makes their choice
+ * - Navigate directly without complex timing
+ * - Root layout won't interfere because we're on welcome screen
  */
 
 import React, { useState } from 'react';
@@ -48,12 +51,16 @@ export default function Welcome() {
   };
 
   /**
-   * Complete onboarding and go to vehicle setup
+   * Complete onboarding then go to vehicle setup
+   * Root layout won't redirect because we check for welcome screen
    */
   const handleAddVehicle = async () => {
     setCompleting(true);
     try {
+      // Complete onboarding
       await completeOnboarding({});
+      
+      // Navigate to vehicle add
       router.replace('/vehicle/add');
     } catch (error) {
       logError(error, {
@@ -96,43 +103,6 @@ export default function Welcome() {
           </Text>
         </View>
 
-        {/* What's Next Section */}
-        {/* <View style={styles.section}>
-          <Text style={styles.sectionTitle}>What you can do now:</Text>
-          
-          <View style={styles.featureList}>
-            <View style={styles.featureItem}>
-              <Ionicons name="search" size={24} color="#2563eb" />
-              <View style={styles.featureContent}>
-                <Text style={styles.featureTitle}>Find Rides</Text>
-                <Text style={styles.featureDescription}>
-                  Search for rides going your way
-                </Text>
-              </View>
-            </View>
-
-            <View style={styles.featureItem}>
-              <Ionicons name="people" size={24} color="#10b981" />
-              <View style={styles.featureContent}>
-                <Text style={styles.featureTitle}>Connect with Coworkers</Text>
-                <Text style={styles.featureDescription}>
-                  Match with people from {userProfile?.company}
-                </Text>
-              </View>
-            </View>
-
-            <View style={styles.featureItem}>
-              <Ionicons name="chatbubbles" size={24} color="#f59e0b" />
-              <View style={styles.featureContent}>
-                <Text style={styles.featureTitle}>Coordinate</Text>
-                <Text style={styles.featureDescription}>
-                  Chat with ride members before pickup
-                </Text>
-              </View>
-            </View>
-          </View>
-        </View> */}
-
         {/* Vehicle Prompt */}
         <View style={styles.vehiclePrompt}>
           <View style={styles.vehiclePromptHeader}>
@@ -143,8 +113,9 @@ export default function Welcome() {
             Add your vehicle to start offering rides to others. You can do this now or anytime from your profile.
           </Text>
         </View>
+      </ScrollView>
 
-              {/* Footer */}
+      {/* Footer */}
       <View style={styles.footer}>
         <TouchableOpacity
           style={[styles.vehicleButton, isLoading && styles.buttonDisabled]}
@@ -170,15 +141,12 @@ export default function Welcome() {
             <ActivityIndicator color="#fff" />
           ) : (
             <>
-              <Text style={styles.startButtonText}>Get Started</Text>
+              <Text style={styles.startButtonText}>Skip & Get Started</Text>
               <Ionicons name="arrow-forward" size={20} color="#fff" />
             </>
           )}
         </TouchableOpacity>
       </View>
-      </ScrollView>
-
-
     </SafeAreaView>
   );
 }
@@ -240,40 +208,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#6b7280',
     textAlign: 'center',
-  },
-  section: {
-    marginBottom: 24,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#111827',
-    marginBottom: 16,
-  },
-  featureList: {
-    gap: 16,
-  },
-  featureItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 16,
-    padding: 16,
-    backgroundColor: '#f9fafb',
-    borderRadius: 12,
-  },
-  featureContent: {
-    flex: 1,
-  },
-  featureTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#111827',
-    marginBottom: 4,
-  },
-  featureDescription: {
-    fontSize: 14,
-    color: '#6b7280',
-    lineHeight: 20,
   },
   vehiclePrompt: {
     backgroundColor: '#eff6ff',

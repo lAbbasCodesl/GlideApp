@@ -50,7 +50,7 @@ export function useVehicle() {
    *   licensePlate: 'ABC123',
    * });
    */
-  const addVehicle = async (vehicleData: Omit<Vehicle, 'updatedAt'>) => {
+  const addVehicle = async (vehicleData: Omit<Vehicle, 'updatedAt' | 'addedAt'>) => {
     if (!user) {
       throw new Error('No user logged in');
     }
@@ -63,7 +63,10 @@ export function useVehicle() {
 
     setLoading(true);
     try {
-      await saveVehicle(user.uid, vehicleData, false);
+      await saveVehicle(user.uid, {
+        ...vehicleData,
+        addedAt: new Date(),
+      }, false);
       
       // Refresh profile in AuthContext
       await refreshUserProfile();

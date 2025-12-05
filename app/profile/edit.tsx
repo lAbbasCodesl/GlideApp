@@ -178,7 +178,7 @@ export default function ProfileEditScreen() {
               <Ionicons name="car" size={24} color="#2563eb" />
               <View style={styles.infoCardContent}>
                 <Text style={styles.infoCardTitle}>
-                  {vehicle.year} {vehicle.make} {vehicle.model}
+                 {vehicle.make} {vehicle.model}
                 </Text>
                 <Text style={styles.infoCardSubtitle}>
                   {vehicle.color} • {vehicle.licensePlate}

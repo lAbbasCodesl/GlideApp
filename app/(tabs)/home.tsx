@@ -11,12 +11,15 @@ import {
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../contexts/AuthContext';
+import { RefreshControl } from 'react-native';
+import { canUseRideFeatures } from '../../types/user';
 
 export default function HomeScreen() {
-  const { userProfile } = useAuth();
+  const { userProfile,refreshUserProfile } = useAuth();
   const router = useRouter();
   const params = useLocalSearchParams();
-  
+  const [refreshing, setRefreshing] = useState(false);
+
   // Location state
   const [startLocation, setStartLocation] = useState({
     address: '',
@@ -70,103 +73,125 @@ export default function HomeScreen() {
     });
   };
 
-  const handleSearch = () => {
-    if (!startLocation.address || !destLocation.address) {
-      alert('Please enter both pickup and drop-off locations');
+const handleSearch = () => {
+  if (!startLocation.address || !destLocation.address) {
+    alert('Please enter both pickup and drop-off locations');
+    return;
+  }
+
+  // CHECK PAYMENT METHODS FIRST
+  if (!userProfile?.paymentMethods || !canUseRideFeatures(userProfile)) {
+    Alert.alert(
+      'Payment Method Required',
+      'Please add at least one payment method before searching for rides.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Add Payment Method',
+          onPress: () => router.push({
+            pathname: '/payment/setup',
+            params: { 
+              required: 'true',
+              returnTo: '/(tabs)/home',
+            },
+          }),
+        },
+      ]
+    );
+    return;
+  }
+
+  // Check if user is trying to offer a ride
+  if (selectedMode === 'offer') {
+    // Check if user has vehicle
+    if (!userProfile?.vehicle) {
+      Alert.alert(
+        'Vehicle Required',
+        'To offer rides, you need to add your vehicle first.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Add Vehicle',
+            onPress: () => router.push('/vehicle/add'),
+          },
+        ]
+      );
       return;
     }
 
-    // Check if user is trying to offer a ride
-    if (selectedMode === 'offer') {
-      // Check if user has vehicle
-      if (!userProfile?.vehicle) {
-        Alert.alert(
-          'Vehicle Required',
-          'To offer rides, you need to add your vehicle first.',
-          [
-            { text: 'Cancel', style: 'cancel' },
-            {
-              text: 'Add Vehicle',
-              onPress: () => router.push('/vehicle/add'),
-            },
-          ]
-        );
-        return;
-      }
-
-      // Check if user has license
-      if (!userProfile?.license) {
-        Alert.alert(
-          'Driver\'s License Required',
-          'To offer rides, you need to upload your driver\'s license for verification.',
-          [
-            { text: 'Cancel', style: 'cancel' },
-            {
-              text: 'Add License',
-              onPress: () => router.push('/license/add'),
-            },
-          ]
-        );
-        return;
-      }
-
-      // Check license verification status
-      if (userProfile.license.verificationStatus === 'rejected') {
-        Alert.alert(
-          'License Verification Failed',
-          userProfile.license.rejectionReason || 'Your license was not approved. Please update and resubmit.',
-          [
-            { text: 'Cancel', style: 'cancel' },
-            {
-              text: 'Update License',
-              onPress: () => router.push({
-                pathname: '/license/add',
-                params: { edit: 'true' },
-              }),
-            },
-          ]
-        );
-        return;
-      }
-
-      if (userProfile.license.verificationStatus === 'expired') {
-        Alert.alert(
-          'License Expired',
-          'Your driver\'s license has expired. Please update it to continue offering rides.',
-          [
-            { text: 'Cancel', style: 'cancel' },
-            {
-              text: 'Update License',
-              onPress: () => router.push({
-                pathname: '/license/add',
-                params: { edit: 'true' },
-              }),
-            },
-          ]
-        );
-        return;
-      }
-
-      // If pending or approved, allow them to continue
-      if (userProfile.license.verificationStatus === 'pending') {
-        Alert.alert(
-          'Verification Pending',
-          'Your license is being verified. You can create rides now, but riders may prefer verified drivers.',
-          [
-            { text: 'Cancel', style: 'cancel' },
-            { text: 'Continue Anyway', onPress: () => createRide() },
-          ]
-        );
-        return;
-      }
-
-      // License approved - proceed
-      createRide();
-    } else {
-      // Find ride mode - no requirements
-      searchRides();
+    // Check if user has license
+    if (!userProfile?.license) {
+      Alert.alert(
+        'Driver\'s License Required',
+        'To offer rides, you need to upload your driver\'s license for verification.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Add License',
+            onPress: () => router.push('/license/add'),
+          },
+        ]
+      );
+      return;
     }
-  };
+
+    // Check license verification status
+    if (userProfile.license.verificationStatus === 'rejected') {
+      Alert.alert(
+        'License Verification Failed',
+        userProfile.license.rejectionReason || 'Your license was not approved. Please update and resubmit.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Update License',
+            onPress: () => router.push({
+              pathname: '/license/add',
+              params: { edit: 'true' },
+            }),
+          },
+        ]
+      );
+      return;
+    }
+
+    if (userProfile.license.verificationStatus === 'expired') {
+      Alert.alert(
+        'License Expired',
+        'Your driver\'s license has expired. Please update it to continue offering rides.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Update License',
+            onPress: () => router.push({
+              pathname: '/license/add',
+              params: { edit: 'true' },
+            }),
+          },
+        ]
+      );
+      return;
+    }
+
+    // If pending or approved, allow them to continue
+    if (userProfile.license.verificationStatus === 'pending') {
+      Alert.alert(
+        'Verification Pending',
+        'Your license is being verified. You can create rides now, but riders may prefer verified drivers.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Continue Anyway', onPress: () => createRide() },
+        ]
+      );
+      return;
+    }
+
+    // License approved - proceed
+    createRide();
+  } else {
+    // Find ride mode - just need payment method (already checked)
+    searchRides();
+  }
+};
 
   const searchRides = () => {
     router.push({
@@ -198,8 +223,16 @@ export default function HomeScreen() {
     });
   };
 
+  const onRefresh = async () => {
+  setRefreshing(true);
+  await refreshUserProfile();  // ⬅️ re-fetch Firestore user profile
+  setRefreshing(false);
+};
+
   return (
-    <ScrollView style={styles.container}>
+    <ScrollView style={styles.container} refreshControl={
+    <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+  }>
       {/* Header */}
       <View style={styles.header}>
         <View>
@@ -261,79 +294,108 @@ export default function HomeScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* Driver Requirements Banner */}
-      {selectedMode === 'offer' && userProfile.license.verificationStatus !== 'approved' && (
-        <View style={styles.requirementsBanner}>
-          {!userProfile?.vehicle || !userProfile?.license ? (
-            <>
-              <Ionicons name="information-circle" size={24} color="#f59e0b" />
-              <View style={styles.requirementsContent}>
-                <Text style={styles.requirementsTitle}>Setup Required</Text>
-                <Text style={styles.requirementsText}>
-                  To offer rides, you need:
-                </Text>
-                <View style={styles.requirementsList}>
-                  <View style={styles.requirementItem}>
-                    <Ionicons 
-                      name={userProfile?.vehicle ? "checkmark-circle" : "ellipse-outline"} 
-                      size={16} 
-                      color={userProfile?.vehicle ? "#10b981" : "#9ca3af"} 
-                    />
-                    <Text style={styles.requirementItemText}>Vehicle information</Text>
-                  </View>
-                  <View style={styles.requirementItem}>
-                    <Ionicons 
-                      name={userProfile?.license ? "checkmark-circle" : "ellipse-outline"} 
-                      size={16} 
-                      color={userProfile?.license ? "#10b981" : "#9ca3af"} 
-                    />
-                    <Text style={styles.requirementItemText}>Driver's license</Text>
-                  </View>
-                </View>
-                <TouchableOpacity 
-                  style={styles.setupButton}
-                  onPress={() => router.push('/profile/edit')}
-                >
-                  <Text style={styles.setupButtonText}>Complete Setup</Text>
-                  <Ionicons name="arrow-forward" size={16} color="#f59e0b" />
-                </TouchableOpacity>
-              </View>
-            </>
-          ) : userProfile.license.verificationStatus === 'pending' ? (
-            <>
-              <Ionicons name="time" size={24} color="#2563eb" />
-              <View style={styles.requirementsContent}>
-                <Text style={styles.requirementsTitle}>Verification Pending</Text>
-                <Text style={styles.requirementsText}>
-                  Your license is being verified. You can create rides now, but riders may prefer verified drivers.
-                </Text>
-              </View>
-            </>
-          ) : (
-            <>
-              <Ionicons name="warning" size={24} color="#ef4444" />
-              <View style={styles.requirementsContent}>
-                <Text style={styles.requirementsTitle}>Action Required</Text>
-                <Text style={styles.requirementsText}>
-                  {userProfile.license.verificationStatus === 'rejected' 
-                    ? 'Your license verification was rejected. Please update it.'
-                    : 'Your license has expired. Please update it to continue offering rides.'}
-                </Text>
-                <TouchableOpacity 
-                  style={[styles.setupButton, styles.setupButtonDanger]}
-                  onPress={() => router.push({
-                    pathname: '/license/add',
-                    params: { edit: 'true' },
-                  })}
-                >
-                  <Text style={styles.setupButtonTextDanger}>Update License</Text>
-                  <Ionicons name="arrow-forward" size={16} color="#ef4444" />
-                </TouchableOpacity>
-              </View>
-            </>
-          )}
+{/* Driver Requirements Banner */}
+{selectedMode === "offer" && (() => {
+  const vehicleExists = !!userProfile?.vehicle;
+  const license = userProfile?.license;
+  const licenseExists = !!license;
+  const status = license?.verificationStatus;
+
+  // HIDE BANNER if everything is complete
+  if (vehicleExists && licenseExists && status === "approved") {
+    return null;
+  }
+
+  // 1. Missing requirements
+  if (!vehicleExists || !licenseExists) {
+    return (
+      <View style={styles.requirementsBanner}>
+        <Ionicons name="information-circle" size={24} color="#f59e0b" />
+
+        <View style={styles.requirementsContent}>
+          <Text style={styles.requirementsTitle}>Setup Required</Text>
+          <Text style={styles.requirementsText}>To offer rides, you need:</Text>
+
+          <View style={styles.requirementsList}>
+            <View style={styles.requirementItem}>
+              <Ionicons
+                name={vehicleExists ? "checkmark-circle" : "ellipse-outline"}
+                size={16}
+                color={vehicleExists ? "#10b981" : "#9ca3af"}
+              />
+              <Text style={styles.requirementItemText}>Vehicle information</Text>
+            </View>
+
+            <View style={styles.requirementItem}>
+              <Ionicons
+                name={licenseExists ? "checkmark-circle" : "ellipse-outline"}
+                size={16}
+                color={licenseExists ? "#10b981" : "#9ca3af"}
+              />
+              <Text style={styles.requirementItemText}>Driver's license</Text>
+            </View>
+          </View>
+
+          <TouchableOpacity
+            style={styles.setupButton}
+            onPress={() => router.push("/profile/edit")}
+          >
+            <Text style={styles.setupButtonText}>Complete Setup</Text>
+            <Ionicons name="arrow-forward" size={16} color="#f59e0b" />
+          </TouchableOpacity>
         </View>
-      )}
+      </View>
+    );
+  }
+
+  // 2. License verification pending
+  if (status === "pending") {
+    return (
+      <View style={styles.requirementsBanner}>
+        <Ionicons name="time" size={24} color="#2563eb" />
+
+        <View style={styles.requirementsContent}>
+          <Text style={styles.requirementsTitle}>Verification Pending</Text>
+          <Text style={styles.requirementsText}>
+            Your license is being verified. You can create rides now, but
+            riders may prefer verified drivers.
+          </Text>
+        </View>
+      </View>
+    );
+  }
+
+  // 3. License rejected or expired
+  return (
+    <View style={styles.requirementsBanner}>
+      <Ionicons name="warning" size={24} color="#ef4444" />
+
+      <View style={styles.requirementsContent}>
+        <Text style={styles.requirementsTitle}>Action Required</Text>
+
+        <Text style={styles.requirementsText}>
+          {status === "rejected"
+            ? "Your license verification was rejected. Please update it."
+            : "Your license has expired. Please update it to continue offering rides."}
+        </Text>
+
+        <TouchableOpacity
+          style={[styles.setupButton, styles.setupButtonDanger]}
+          onPress={() =>
+            router.push({
+              pathname: "/license/add",
+              params: { edit: "true" },
+            })
+          }
+        >
+          <Text style={styles.setupButtonTextDanger}>Update License</Text>
+          <Ionicons name="arrow-forward" size={16} color="#ef4444" />
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+})()}
+
 
       {/* Location Inputs */}
       <View style={styles.locationContainer}>

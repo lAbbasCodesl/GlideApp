@@ -1,4 +1,12 @@
-// app/_layout.tsx - WITH COMPLETE ONBOARDING ROUTING
+// app/_layout.tsx - SIMPLE FIX
+/**
+ * Root Layout - Navigation Controller
+ * 
+ * SIMPLE FIX:
+ * - Don't redirect from welcome screen when onboarding completes
+ * - Let welcome screen handle its own navigation
+ */
+
 import { Slot, useRouter, useSegments } from 'expo-router';
 import { useEffect } from 'react';
 import { AuthProvider, useAuth } from '../contexts/AuthContext';
@@ -15,6 +23,10 @@ function RootLayoutNav() {
     const inAuthGroup = segments[0] === '(auth)';
     const inOnboardingGroup = segments[0] === 'onboarding';
     const inMainApp = segments[0] === '(tabs)';
+    
+    // Check if we're specifically on the welcome screen
+    // segments[1] will be 'welcome' when path is 'onboarding/welcome'
+    const onWelcomeScreen = segments[0] === 'onboarding' && segments[1] === 'welcome';
 
     console.log('🔍 Navigation Check:', {
       user: !!user,
@@ -23,6 +35,8 @@ function RootLayoutNav() {
       needsOnboarding,
       onboardingCompleted: userProfile?.onboardingCompleted,
       currentPath: segments.join('/'),
+      segments: segments,
+      onWelcomeScreen,
     });
 
     // Case 1: No user → sign in
@@ -54,7 +68,8 @@ function RootLayoutNav() {
     }
 
     // Case 5: User authenticated and onboarded, redirect from onboarding to app
-    if (user && !needsEmailVerification && !needsOnboarding && inOnboardingGroup) {
+    // BUT: DON'T redirect if on welcome screen - let it handle its own navigation
+    if (user && !needsEmailVerification && !needsOnboarding && inOnboardingGroup && !onWelcomeScreen) {
       console.log('➡️ Redirecting to home (onboarding complete)');
       router.replace('/(tabs)/home');
       return;

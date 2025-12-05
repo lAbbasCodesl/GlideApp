@@ -1,21 +1,31 @@
-// types/user.ts - UPDATED FOR PEER-TO-PEER RIDESHARING
+// types/user.ts - UPDATED with payment methods and pricing
 
 /**
- * Core user profile - required for all users
+ * Payment methods supported
+ */
+export interface PaymentMethods {
+  venmo?: string;      // @username
+  cashapp?: string;    // $username
+  acceptsCash: boolean;
+}
+
+/**
+ * Core user profile - updated with payment info
  */
 export interface UserProfile {
   uid: string;
   email: string;
   displayName: string;
   photoURL?: string;
-  phoneNumber?: string;        // Required during onboarding
-  company?: string;             // Required during onboarding
+  phoneNumber?: string;
+  company?: string;
   rating: number;
-  totalRides: number;           // Total rides taken as passenger
-  totalRidesOffered: number;    // Total rides offered to others
-  vehicle?: Vehicle;            // Vehicle info (optional - only if offering rides)
-  license?: License;            // Driver's license info (user-level, not vehicle-level)
-  onboardingCompleted: boolean; // Track if user finished initial onboarding
+  totalRides: number;
+  totalRidesOffered: number;
+  vehicle?: Vehicle;
+  license?: License;
+  paymentMethods?: PaymentMethods;  // NEW: How user accepts/sends payments
+  onboardingCompleted: boolean;
   hasSeenAppGuide?: boolean;
   hasSeenRiderGuide?: boolean;
   hasSeenDriverGuide?: boolean;
@@ -24,50 +34,41 @@ export interface UserProfile {
 }
 
 /**
- * Vehicle information - stored inline with user profile
- * Future: Can be extracted to separate collection for multiple vehicles
- * 
- * Note: This is vehicle-specific info only. Driver's license is separate
- * because one person can have multiple vehicles but only one license.
+ * Vehicle information - with pricing
  */
 export interface Vehicle {
-  make: string;              // e.g., "Toyota"
-  model: string;             // e.g., "Camry"
-  year: number;              // e.g., 2020
-  color: string;             // e.g., "Blue"
-  licensePlate: string;      // e.g., "ABC-123"
-  addedAt: Date;             // When vehicle was added
-  updatedAt?: Date;          // When vehicle details were last updated
+  make: string;
+  model: string;
+  color: string;
+  licensePlate: string;
+  ratePerMile: number;        // NEW: Rate per mile ($0.50 - $2.00)
+  addedAt: Date;
+  updatedAt?: Date;
 }
 
 /**
- * Driver's license information - belongs to the USER, not the vehicle
- * One user has one license, but can have multiple vehicles
- * 
- * Verification status determines if user can offer rides
+ * Driver's license information
  */
 export interface License {
-  licenseNumber?: string;          // Optional - for admin verification only, not displayed
-  stateOfIssue: string;            // e.g., "CA", "NY", "TX"
-  expirationDate?: Date;           // Optional - for renewal reminders
-  frontPhotoURL?: string;          // Firebase Storage URL for front of license
-  backPhotoURL?: string;           // Firebase Storage URL for back of license
+  licenseNumber?: string;
+  stateOfIssue: string;
+  expirationDate?: Date;
+  frontPhotoURL?: string;
+  backPhotoURL?: string;
   verificationStatus: 'pending' | 'approved' | 'rejected' | 'expired';
-  verificationDate?: Date;         // When license was verified
-  rejectionReason?: string;        // If rejected, reason for admin/user
-  submittedAt: Date;               // When user submitted for verification
-  updatedAt?: Date;                // When license info was last updated
+  verificationDate?: Date;
+  rejectionReason?: string;
+  submittedAt: Date;
+  updatedAt?: Date;
 }
 
 /**
  * Car makes with their popular models
- * Used for dropdown selections
  */
 export interface CarMake {
   make: string;
   models: string[];
 }
-
 /**
  * Static data for vehicle selection
  * Source: Based on most popular cars in US market
@@ -180,19 +181,6 @@ export const VEHICLE_COLORS = [
 ];
 
 /**
- * Vehicle years for dropdown
- * Generates array from current year back to 2000
- */
-export const getVehicleYears = (): number[] => {
-  const currentYear = new Date().getFullYear();
-  const years: number[] = [];
-  for (let year = currentYear; year >= 2000; year--) {
-    years.push(year);
-  }
-  return years;
-};
-
-/**
  * Helper to get models for a specific make
  */
 export const getModelsForMake = (make: string): string[] => {
@@ -201,30 +189,87 @@ export const getModelsForMake = (make: string): string[] => {
 };
 
 /**
- * Validation helpers
+ * Calculate ride price based on distance and rate
+ * Minimum charge is $5.00
  */
-export const isValidLicensePlate = (plate: string): boolean => {
-  // Basic validation - at least 2 characters, max 10
-  // Allows letters, numbers, spaces, hyphens
-  const regex = /^[A-Z0-9\s-]{2,10}$/i;
-  return regex.test(plate.trim());
+export const calculateRidePrice = (distanceInMiles: number, ratePerMile: number): number => {
+  const calculatedPrice = distanceInMiles * ratePerMile;
+  return Math.max(5.00, Number(calculatedPrice.toFixed(2)));
 };
 
-export const isValidPhoneNumber = (phone: string): boolean => {
-  // Basic US phone validation - 10 digits
-  // Accepts formats: 1234567890, 123-456-7890, (123) 456-7890
-  const cleaned = phone.replace(/\D/g, '');
-  return cleaned.length === 10;
+/**
+ * Validate rate per mile
+ */
+export const isValidRatePerMile = (rate: number): boolean => {
+  return rate >= 0.50 && rate <= 2.00;
 };
 
-export const formatPhoneNumber = (phone: string): string => {
-  const cleaned = phone.replace(/\D/g, '');
-  
-  if (cleaned.length === 10) {
-    return `(${cleaned.slice(0, 3)}) ${cleaned.slice(3, 6)}-${cleaned.slice(6)}`;
-  }
-  
-  return phone;
+/**
+ * Format rate for display
+ */
+export const formatRate = (rate: number): string => {
+  return `$${rate.toFixed(2)}/mile`;
+};
+
+/**
+ * Format price for display
+ */
+export const formatPrice = (price: number): string => {
+  return `$${price.toFixed(2)}`;
+};
+
+/**
+ * Validate payment methods
+ */
+export const hasPaymentMethod = (paymentMethods?: PaymentMethods): boolean => {
+  if (!paymentMethods) return false;
+  return !!(paymentMethods.venmo || paymentMethods.cashapp || paymentMethods.acceptsCash);
+};
+
+/**
+ * Validate Venmo handle
+ */
+export const isValidVenmoHandle = (handle: string): boolean => {
+  // Should start with @ and be 5-30 characters
+  const cleaned = handle.trim();
+  if (!cleaned.startsWith('@')) return false;
+  const username = cleaned.slice(1);
+  return username.length >= 4 && username.length <= 30 && /^[a-zA-Z0-9_-]+$/.test(username);
+};
+
+/**
+ * Validate CashApp handle
+ */
+export const isValidCashappHandle = (handle: string): boolean => {
+  // Should start with $ and be 5-30 characters
+  const cleaned = handle.trim();
+  if (!cleaned.startsWith('$')) return false;
+  const username = cleaned.slice(1);
+  return username.length >= 4 && username.length <= 30 && /^[a-zA-Z0-9_-]+$/.test(username);
+};
+
+/**
+ * Format Venmo handle
+ */
+export const formatVenmoHandle = (handle: string): string => {
+  const cleaned = handle.trim();
+  return cleaned.startsWith('@') ? cleaned : `@${cleaned}`;
+};
+
+/**
+ * Format CashApp handle
+ */
+export const formatCashappHandle = (handle: string): string => {
+  const cleaned = handle.trim();
+  return cleaned.startsWith('$') ? cleaned : `$${cleaned}`;
+};
+
+/**
+ * Check if user can search/create rides
+ * Requires at least one payment method
+ */
+export const canUseRideFeatures = (profile: UserProfile): boolean => {
+  return hasPaymentMethod(profile.paymentMethods);
 };
 
 /**
@@ -235,12 +280,13 @@ export const hasVehicle = (profile: UserProfile): boolean => {
 };
 
 /**
- * Check if user can offer rides (has vehicle + approved license)
+ * Check if user can offer rides (has vehicle + approved license + payment method)
  */
 export const canOfferRides = (profile: UserProfile): boolean => {
   return hasVehicle(profile) && 
          !!profile.license && 
-         profile.license.verificationStatus === 'approved';
+         profile.license.verificationStatus === 'approved' &&
+         hasPaymentMethod(profile.paymentMethods);
 };
 
 /**
@@ -253,13 +299,13 @@ export const hasPendingVerification = (profile: UserProfile): boolean => {
 
 /**
  * Check if user can offer rides with pending verification
- * (Your business rule: allow offering rides while verification is pending)
  */
 export const canOfferRidesWithPending = (profile: UserProfile): boolean => {
   return hasVehicle(profile) && 
          !!profile.license && 
          (profile.license.verificationStatus === 'approved' || 
-          profile.license.verificationStatus === 'pending');
+          profile.license.verificationStatus === 'pending') &&
+         hasPaymentMethod(profile.paymentMethods);
 };
 
 /**
@@ -290,4 +336,25 @@ export const needsLicenseRenewal = (license?: License): boolean => {
   thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
   
   return new Date(license.expirationDate) <= thirtyDaysFromNow;
+};
+
+// Keep all existing validation helpers and constants
+export const isValidLicensePlate = (plate: string): boolean => {
+  const regex = /^[A-Z0-9\s-]{2,10}$/i;
+  return regex.test(plate.trim());
+};
+
+export const isValidPhoneNumber = (phone: string): boolean => {
+  const cleaned = phone.replace(/\D/g, '');
+  return cleaned.length === 10;
+};
+
+export const formatPhoneNumber = (phone: string): string => {
+  const cleaned = phone.replace(/\D/g, '');
+  
+  if (cleaned.length === 10) {
+    return `(${cleaned.slice(0, 3)}) ${cleaned.slice(3, 6)}-${cleaned.slice(6)}`;
+  }
+  
+  return phone;
 };

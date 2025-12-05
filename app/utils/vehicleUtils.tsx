@@ -12,7 +12,7 @@ import { Vehicle } from "../../types/user";
  * // Returns: "2020 Blue Toyota Camry"
  */
 export const formatVehicleDisplay = (vehicle: Vehicle): string => {
-  return `${vehicle.year} ${vehicle.color} ${vehicle.make} ${vehicle.model}`;
+  return `${vehicle.color} ${vehicle.make} ${vehicle.model}`;
 };
 
 /**
@@ -41,10 +41,6 @@ export const validateVehicle = (vehicle: Partial<Vehicle>): {
 
   if (!vehicle.model || vehicle.model.trim() === '') {
     return { isValid: false, error: 'Please select a vehicle model' };
-  }
-
-  if (!vehicle.year || vehicle.year < 2000 || vehicle.year > new Date().getFullYear()) {
-    return { isValid: false, error: 'Please select a valid year' };
   }
 
   if (!vehicle.color || vehicle.color.trim() === '') {

@@ -36,13 +36,16 @@ import { useVehicle } from '../../hooks';
 import {
   CAR_MAKES,
   VEHICLE_COLORS,
-  getVehicleYears,
+  calculateRidePrice,
+  formatPrice,
+  formatRate,
   getModelsForMake,
+  isValidRatePerMile,
 } from '../../types/user';
 import { sanitizeLicensePlate } from '../../app/utils/vehicleUtils';
 import { logError, ErrorSeverity } from '../../app/utils/ErrorHandler';
 
-type DropdownType = 'make' | 'model' | 'year' | 'color' | null;
+type DropdownType = 'make' | 'model' | 'color' | null;
 
 export default function VehicleAddScreen() {
   const { userProfile } = useAuth();
@@ -55,9 +58,9 @@ export default function VehicleAddScreen() {
   // Form state
   const [make, setMake] = useState('');
   const [model, setModel] = useState('');
-  const [year, setYear] = useState<number | null>(null);
   const [color, setColor] = useState('');
   const [licensePlate, setLicensePlate] = useState('');
+  const [ratePerMile, setRatePerMile] = useState('1.00');
 
   // Dropdown state
   const [activeDropdown, setActiveDropdown] = useState<DropdownType>(null);
@@ -68,9 +71,9 @@ export default function VehicleAddScreen() {
     if (vehicle && isEditing) {
       setMake(vehicle.make);
       setModel(vehicle.model);
-      setYear(vehicle.year);
       setColor(vehicle.color);
       setLicensePlate(vehicle.licensePlate);
+      setRatePerMile(vehicle.ratePerMile.toFixed(2));
       setModelOptions(getModelsForMake(vehicle.make));
     }
   }, [vehicle, isEditing]);
@@ -100,11 +103,6 @@ export default function VehicleAddScreen() {
       return;
     }
 
-    if (!year) {
-      Alert.alert('Year Required', 'Please select a vehicle year');
-      return;
-    }
-
     if (!color) {
       Alert.alert('Color Required', 'Please select a vehicle color');
       return;
@@ -123,14 +121,22 @@ export default function VehicleAddScreen() {
       );
       return;
     }
+    const rate = parseFloat(ratePerMile);
+    if (isNaN(rate) || !isValidRatePerMile(rate)) {
+      Alert.alert(
+        'Invalid Rate',
+        'Rate per mile must be between $0.50 and $2.00'
+      );
+      return;
+    }
 
     try {
       const vehicleData = {
         make,
         model,
-        year,
         color,
         licensePlate: sanitized,
+        ratePerMile: rate,
       };
 
       if (isEditing) {
@@ -198,13 +204,6 @@ export default function VehicleAddScreen() {
           setActiveDropdown(null);
         };
         break;
-      case 'year':
-        data = getVehicleYears().map(y => ({ label: y.toString(), value: y }));
-        onSelect = (value) => {
-          setYear(value);
-          setActiveDropdown(null);
-        };
-        break;
       case 'color':
         data = VEHICLE_COLORS.map(c => ({ label: c, value: c }));
         onSelect = (value) => {
@@ -251,6 +250,13 @@ export default function VehicleAddScreen() {
     );
   };
 
+  const rate = parseFloat(ratePerMile) || 0;
+  const examplePrices = [
+    { distance: 5, price: calculateRidePrice(5, rate) },
+    { distance: 10, price: calculateRidePrice(10, rate) },
+    { distance: 20, price: calculateRidePrice(20, rate) },
+  ];
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
@@ -264,13 +270,12 @@ export default function VehicleAddScreen() {
       </View>
 
       <ScrollView style={styles.content}>
+        {/* Vehicle Info Section */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Vehicle Information</Text>
-          <Text style={styles.sectionSubtitle}>
+            <Text style={styles.sectionSubtitle}>
             This helps riders identify your vehicle
-          </Text>
-
-          {/* Make */}
+            </Text>
           <View style={styles.inputGroup}>
             <Text style={styles.label}>Make *</Text>
             <TouchableOpacity
@@ -286,7 +291,6 @@ export default function VehicleAddScreen() {
             </TouchableOpacity>
           </View>
 
-          {/* Model */}
           <View style={styles.inputGroup}>
             <Text style={styles.label}>Model *</Text>
             <TouchableOpacity
@@ -302,23 +306,10 @@ export default function VehicleAddScreen() {
             </TouchableOpacity>
           </View>
 
-          {/* Year & Color Row */}
-          <View style={styles.row}>
-            <View style={[styles.inputGroup, { flex: 1, marginRight: 8 }]}>
-              <Text style={styles.label}>Year *</Text>
-              <TouchableOpacity
-                style={styles.selectButton}
-                onPress={() => setActiveDropdown('year')}
-                disabled={loading}
-              >
-                <Text style={[styles.selectText, year && styles.selectTextFilled]}>
-                  {year || 'Year'}
-                </Text>
-                <Ionicons name="chevron-down" size={20} color="#9ca3af" />
-              </TouchableOpacity>
-            </View>
 
-            <View style={[styles.inputGroup, { flex: 1, marginLeft: 8 }]}>
+            
+
+            <View style={[styles.inputGroup]}>
               <Text style={styles.label}>Color *</Text>
               <TouchableOpacity
                 style={styles.selectButton}
@@ -331,9 +322,7 @@ export default function VehicleAddScreen() {
                 <Ionicons name="chevron-down" size={20} color="#9ca3af" />
               </TouchableOpacity>
             </View>
-          </View>
 
-          {/* License Plate */}
           <View style={styles.inputGroup}>
             <Text style={styles.label}>License Plate *</Text>
             <View style={styles.inputContainer}>
@@ -348,24 +337,64 @@ export default function VehicleAddScreen() {
                 maxLength={10}
               />
             </View>
-            <Text style={styles.hint}>
-              Enter as it appears on your plate
-            </Text>
           </View>
         </View>
 
+        {/* Pricing Section */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Pricing</Text>
+          <Text style={styles.sectionSubtitle}>
+            Set your rate per mile ($0.50 - $2.00)
+          </Text>
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Rate Per Mile *</Text>
+            <View style={styles.inputContainer}>
+              <Text style={styles.inputPrefix}>$</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="1.00"
+                value={ratePerMile}
+                onChangeText={setRatePerMile}
+                keyboardType="decimal-pad"
+                editable={!loading}
+              />
+              <Text style={styles.inputSuffix}>/mile</Text>
+            </View>
+            <Text style={styles.hint}>
+              Minimum fare is $5.00 regardless of distance
+            </Text>
+          </View>
+
+          {/* Price Examples */}
+          {rate > 0 && isValidRatePerMile(rate) && (
+            <View style={styles.priceExamples}>
+              <Text style={styles.priceExamplesTitle}>Example Fares</Text>
+              {examplePrices.map(({ distance, price }) => (
+                <View key={distance} style={styles.priceExample}>
+                  <Text style={styles.priceDistance}>{distance} miles</Text>
+                  <Text style={styles.priceAmount}>{formatPrice(price)}</Text>
+                </View>
+              ))}
+            </View>
+          )}
+        </View>
+
         {/* Preview */}
-        {make && model && year && color && (
+        {make && model && color && (
           <View style={styles.previewSection}>
             <Text style={styles.previewTitle}>Preview</Text>
             <View style={styles.previewCard}>
               <Ionicons name="car" size={32} color="#2563eb" />
               <View style={styles.previewContent}>
                 <Text style={styles.previewText}>
-                  {year} {color} {make} {model}
+                    {color} {make} {model}
                 </Text>
                 {licensePlate && (
                   <Text style={styles.previewPlate}>{licensePlate}</Text>
+                )}
+                {rate > 0 && isValidRatePerMile(rate) && (
+                  <Text style={styles.previewRate}>{formatRate(rate)}</Text>
                 )}
               </View>
             </View>
@@ -472,6 +501,15 @@ const styles = StyleSheet.create({
     backgroundColor: '#f9fafb',
     gap: 12,
   },
+  inputPrefix: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#6b7280',
+  },
+  inputSuffix: {
+    fontSize: 14,
+    color: '#6b7280',
+  },
   input: {
     flex: 1,
     height: 50,
@@ -485,6 +523,32 @@ const styles = StyleSheet.create({
   },
   row: {
     flexDirection: 'row',
+  },
+  priceExamples: {
+    backgroundColor: '#f0fdf4',
+    padding: 16,
+    borderRadius: 12,
+    marginTop: 16,
+  },
+  priceExamplesTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#166534',
+    marginBottom: 12,
+  },
+  priceExample: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingVertical: 8,
+  },
+  priceDistance: {
+    fontSize: 15,
+    color: '#166534',
+  },
+  priceAmount: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#166534',
   },
   previewSection: {
     backgroundColor: '#fff',
@@ -518,6 +582,12 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#1e40af',
     fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+    marginBottom: 4,
+  },
+  previewRate: {
+    fontSize: 14,
+    color: '#10b981',
+    fontWeight: '600',
   },
   footer: {
     padding: 16,
