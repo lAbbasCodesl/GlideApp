@@ -184,15 +184,7 @@ export default function PaymentSetupScreen() {
       />
     </View>
 
-    {/* Dynamic Preview */}
-    {venmoHandle.length > 0 && (
-      <Text style={styles.hint}>Your tag: @{venmoHandle}</Text>
-    )}
-
-    {/* Default hint if empty */}
-    {venmoHandle.length === 0 && (
       <Text style={styles.hint}>e.g., @john-smith or @johnsmith123</Text>
-    )}
   </View>
 </View>
 
@@ -224,12 +216,8 @@ export default function PaymentSetupScreen() {
         editable={!loading}
       />
     </View>
-
-    {/* Dynamic Example */}
     <Text style={styles.hint}>
-      {cashappHandle.trim().length > 0
-        ? `Your tag: $${cashappHandle.replace('$', '')}`
-        : 'e.g., $johnsmith or $john-smith'}
+        e.g., $johnsmith or $john-smith
     </Text>
   </View>
 </View>

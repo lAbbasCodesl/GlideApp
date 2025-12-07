@@ -249,16 +249,16 @@ export const isValidCashappHandle = (handle: string): boolean => {
  * Format Venmo handle
  */
 export const formatVenmoHandle = (handle: string): string => {
-  const cleaned = handle.trim();
-  return cleaned.startsWith('@') ? cleaned : `@${cleaned}`;
+  return handle.trim();
+
 };
 
 /**
  * Format CashApp handle
  */
 export const formatCashappHandle = (handle: string): string => {
-  const cleaned = handle.trim();
-  return cleaned.startsWith('$') ? cleaned : `$${cleaned}`;
+  return handle.trim();
+
 };
 
 /**

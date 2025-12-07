@@ -200,7 +200,7 @@ export default function LicenseAddScreen() {
         );
       } else {
         // Submit new license
-        await submitLicense(frontPhoto, backPhoto, { stateOfIssue });
+        await submitLicense(frontPhoto, backPhoto, { stateOfIssue, submittedAt: new Date() });
         
         Alert.alert(
           'License Submitted!',

@@ -170,7 +170,7 @@ const handleSearch = () => {
     if (userProfile.license.verificationStatus === 'pending') {
       Alert.alert(
         'Verification Pending',
-        'Your license is being verified. You can create rides now, but riders may prefer verified drivers.',
+        'Your license is being verified. You can still offer rides while it is pending',
         [
           { text: 'Cancel', style: 'cancel' },
           { text: 'Continue Anyway', onPress: () => createRide() },
@@ -351,8 +351,7 @@ const handleSearch = () => {
         <View style={styles.requirementsContent}>
           <Text style={styles.requirementsTitle}>Verification Pending</Text>
           <Text style={styles.requirementsText}>
-            Your license is being verified. You can create rides now, but
-            riders may prefer verified drivers.
+            Your license is being verified. You can still offer rides while it is pending
           </Text>
         </View>
       </View>
