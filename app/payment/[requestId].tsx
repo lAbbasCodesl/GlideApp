@@ -11,8 +11,8 @@ export default function PaymentScreen() {
     amount: 5,
     driverName: 'Alice Johnson',
     paymentMethods: {
-      venmo: '@atalawala',
-      cashapp: '$alicejohnson',
+      venmo: 'atalawala',
+      cashapp: 'alicejohnson',
     },
   };
 
@@ -28,12 +28,12 @@ export default function PaymentScreen() {
       
       // Try multiple Venmo URL formats
       url = `venmo://paycharge?txn=pay&recipients=${venmoUser}&amount=${amount}&note=${note}`;
-      fallbackUrl = `https://venmo.com/${venmoUser}?txn=pay&amount=${amount}&note=${note}`;
+      fallbackUrl = `https://venmo.com/@${venmoUser}?txn=pay&amount=${amount}&note=${note}`;
     } else {
       // CashApp deep link
       const cashTag = paymentMethods.cashapp.replace(/[\$]/g, '');
-      url = `cashapp://cash.app/${cashTag}/${amount}`;
-      fallbackUrl = `https://cash.app/${cashTag}/${amount}`;
+      url = `cashapp://cash.app/$${cashTag}/${amount}`;
+      fallbackUrl = `https://cash.app/$${cashTag}/${amount}`;
     }
 
     // Try opening the app directly

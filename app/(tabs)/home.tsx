@@ -1,65 +1,232 @@
-import React, { useState } from 'react';
+// app/(tabs)/home.tsx - FIXED VERSION with address state management
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
   TouchableOpacity,
   StyleSheet,
   ScrollView,
-  TextInput,
+  Alert,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../contexts/AuthContext';
+import { RefreshControl } from 'react-native';
+import { canUseRideFeatures } from '../../types/user';
 
 export default function HomeScreen() {
-  const { userProfile } = useAuth();
+  const { userProfile,refreshUserProfile } = useAuth();
   const router = useRouter();
+  const params = useLocalSearchParams();
+  const [refreshing, setRefreshing] = useState(false);
+
+  // Location state
+  const [startLocation, setStartLocation] = useState({
+    address: '',
+    lat: null as number | null,
+    lng: null as number | null,
+  });
   
-  const [startLocation, setStartLocation] = useState('');
-  const [destLocation, setDestLocation] = useState('');
+  const [destLocation, setDestLocation] = useState({
+    address: '',
+    lat: null as number | null,
+    lng: null as number | null,
+  });
+  
   const [selectedMode, setSelectedMode] = useState<'find' | 'offer'>('find');
+
+  // Listen for address updates from address-selection screen
+  useEffect(() => {
+    // Check for start location update
+    if (params.startAddress && params.startAddress !== startLocation.address) {
+      setStartLocation({
+        address: params.startAddress as string,
+        lat: params.startLat ? parseFloat(params.startLat as string) : null,
+        lng: params.startLng ? parseFloat(params.startLng as string) : null,
+      });
+    }
+
+    // Check for destination location update
+    if (params.destAddress && params.destAddress !== destLocation.address) {
+      setDestLocation({
+        address: params.destAddress as string,
+        lat: params.destLat ? parseFloat(params.destLat as string) : null,
+        lng: params.destLng ? parseFloat(params.destLng as string) : null,
+      });
+    }
+  }, [params.startAddress, params.startLat, params.startLng, params.destAddress, params.destLat, params.destLng]);
 
   const handleLocationSelect = (type: 'start' | 'dest') => {
     router.push({
       pathname: '/address-selection',
-      params: { type, returnTo: '/(tabs)/home' },
+      params: { 
+        type, 
+        returnTo: '/(tabs)/home',
+        // Pass current locations so they can be preserved
+        currentStartAddress: startLocation.address || undefined,
+        currentStartLat: startLocation.lat?.toString() || undefined,
+        currentStartLng: startLocation.lng?.toString() || undefined,
+        currentDestAddress: destLocation.address || undefined,
+        currentDestLat: destLocation.lat?.toString() || undefined,
+        currentDestLng: destLocation.lng?.toString() || undefined,
+      },
     });
   };
 
-  const handleSearch = () => {
-    if (!startLocation || !destLocation) {
-      alert('Please enter both locations');
+const handleSearch = () => {
+  if (!startLocation.address || !destLocation.address) {
+    alert('Please enter both pickup and drop-off locations');
+    return;
+  }
+
+  // CHECK PAYMENT METHODS FIRST
+  if (!userProfile?.paymentMethods || !canUseRideFeatures(userProfile)) {
+    Alert.alert(
+      'Payment Method Required',
+      'Please add at least one payment method before searching for rides.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Add Payment Method',
+          onPress: () => router.push('/payment/setup'),
+        },
+      ]
+    );
+    return;
+  }
+
+  // Check if user is trying to offer a ride
+  if (selectedMode === 'offer') {
+    // Check if user has vehicle
+    if (!userProfile?.vehicle) {
+      Alert.alert(
+        'Vehicle Required',
+        'To offer rides, you need to add your vehicle first.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Add Vehicle',
+            onPress: () => router.push('/vehicle/add'),
+          },
+        ]
+      );
       return;
     }
 
-    if (selectedMode === 'find') {
-      router.push({
-        pathname: '/search-results',
-        params: {
-          startLat: '37.7749',
-          startLng: '-122.4194',
-          destLat: '37.8044',
-          destLng: '-122.2712',
-          mode: 'rider',
-        },
-      });
-    } else {
-      // Create ride and show potential riders
-      router.push({
-        pathname: '/search-results',
-        params: {
-          startLat: '37.7749',
-          startLng: '-122.4194',
-          destLat: '37.8044',
-          destLng: '-122.2712',
-          mode: 'driver',
-        },
-      });
+    // Check if user has license
+    if (!userProfile?.license) {
+      Alert.alert(
+        'Driver\'s License Required',
+        'To offer rides, you need to upload your driver\'s license for verification.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Add License',
+            onPress: () => router.push('/license/add'),
+          },
+        ]
+      );
+      return;
     }
+
+    // Check license verification status
+    if (userProfile.license.verificationStatus === 'rejected') {
+      Alert.alert(
+        'License Verification Failed',
+        userProfile.license.rejectionReason || 'Your license was not approved. Please update and resubmit.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Update License',
+            onPress: () => router.push({
+              pathname: '/license/add',
+              params: { edit: 'true' },
+            }),
+          },
+        ]
+      );
+      return;
+    }
+
+    if (userProfile.license.verificationStatus === 'expired') {
+      Alert.alert(
+        'License Expired',
+        'Your driver\'s license has expired. Please update it to continue offering rides.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Update License',
+            onPress: () => router.push({
+              pathname: '/license/add',
+              params: { edit: 'true' },
+            }),
+          },
+        ]
+      );
+      return;
+    }
+
+    // If pending or approved, allow them to continue
+    if (userProfile.license.verificationStatus === 'pending') {
+      Alert.alert(
+        'Verification Pending',
+        'Your license is being verified. You can still offer rides while it is pending',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Continue Anyway', onPress: () => createRide() },
+        ]
+      );
+      return;
+    }
+
+    // License approved - proceed
+    createRide();
+  } else {
+    // Find ride mode - just need payment method (already checked)
+    searchRides();
+  }
+};
+
+  const searchRides = () => {
+    router.push({
+      pathname: '/search-results',
+      params: {
+        startLat: startLocation.lat?.toString() || '37.7749',
+        startLng: startLocation.lng?.toString() || '-122.4194',
+        destLat: destLocation.lat?.toString() || '37.8044',
+        destLng: destLocation.lng?.toString() || '-122.2712',
+        startAddress: startLocation.address,
+        destAddress: destLocation.address,
+        mode: 'rider',
+      },
+    });
   };
 
+  const createRide = () => {
+    router.push({
+      pathname: '/search-results',
+      params: {
+        startLat: startLocation.lat?.toString() || '37.7749',
+        startLng: startLocation.lng?.toString() || '-122.4194',
+        destLat: destLocation.lat?.toString() || '37.8044',
+        destLng: destLocation.lng?.toString() || '-122.2712',
+        startAddress: startLocation.address,
+        destAddress: destLocation.address,
+        mode: 'driver',
+      },
+    });
+  };
+
+  const onRefresh = async () => {
+  setRefreshing(true);
+  await refreshUserProfile();  // ⬅️ re-fetch Firestore user profile
+  setRefreshing(false);
+};
+
   return (
-    <ScrollView style={styles.container}>
+    <ScrollView style={styles.container} refreshControl={
+    <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+  }>
       {/* Header */}
       <View style={styles.header}>
         <View>
@@ -121,6 +288,108 @@ export default function HomeScreen() {
         </TouchableOpacity>
       </View>
 
+{/* Driver Requirements Banner */}
+{selectedMode === "offer" && (() => {
+  const vehicleExists = !!userProfile?.vehicle;
+  const license = userProfile?.license;
+  const licenseExists = !!license;
+  const status = license?.verificationStatus;
+
+  // HIDE BANNER if everything is complete
+  if (vehicleExists && licenseExists && status === "approved") {
+    return null;
+  }
+
+  // 1. Missing requirements
+  if (!vehicleExists || !licenseExists) {
+    return (
+      <View style={styles.requirementsBanner}>
+        <Ionicons name="information-circle" size={24} color="#f59e0b" />
+
+        <View style={styles.requirementsContent}>
+          <Text style={styles.requirementsTitle}>Setup Required</Text>
+          <Text style={styles.requirementsText}>To offer rides, you need:</Text>
+
+          <View style={styles.requirementsList}>
+            <View style={styles.requirementItem}>
+              <Ionicons
+                name={vehicleExists ? "checkmark-circle" : "ellipse-outline"}
+                size={16}
+                color={vehicleExists ? "#10b981" : "#9ca3af"}
+              />
+              <Text style={styles.requirementItemText}>Vehicle information</Text>
+            </View>
+
+            <View style={styles.requirementItem}>
+              <Ionicons
+                name={licenseExists ? "checkmark-circle" : "ellipse-outline"}
+                size={16}
+                color={licenseExists ? "#10b981" : "#9ca3af"}
+              />
+              <Text style={styles.requirementItemText}>Driver's license</Text>
+            </View>
+          </View>
+
+          <TouchableOpacity
+            style={styles.setupButton}
+            onPress={() => router.push("/profile/edit")}
+          >
+            <Text style={styles.setupButtonText}>Complete Setup</Text>
+            <Ionicons name="arrow-forward" size={16} color="#f59e0b" />
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
+
+  // 2. License verification pending
+  if (status === "pending") {
+    return (
+      <View style={styles.requirementsBanner}>
+        <Ionicons name="time" size={24} color="#2563eb" />
+
+        <View style={styles.requirementsContent}>
+          <Text style={styles.requirementsTitle}>Verification Pending</Text>
+          <Text style={styles.requirementsText}>
+            Your license is being verified. You can still offer rides while it is pending
+          </Text>
+        </View>
+      </View>
+    );
+  }
+
+  // 3. License rejected or expired
+  return (
+    <View style={styles.requirementsBanner}>
+      <Ionicons name="warning" size={24} color="#ef4444" />
+
+      <View style={styles.requirementsContent}>
+        <Text style={styles.requirementsTitle}>Action Required</Text>
+
+        <Text style={styles.requirementsText}>
+          {status === "rejected"
+            ? "Your license verification was rejected. Please update it."
+            : "Your license has expired. Please update it to continue offering rides."}
+        </Text>
+
+        <TouchableOpacity
+          style={[styles.setupButton, styles.setupButtonDanger]}
+          onPress={() =>
+            router.push({
+              pathname: "/license/add",
+              params: { edit: "true" },
+            })
+          }
+        >
+          <Text style={styles.setupButtonTextDanger}>Update License</Text>
+          <Ionicons name="arrow-forward" size={16} color="#ef4444" />
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+})()}
+
+
       {/* Location Inputs */}
       <View style={styles.locationContainer}>
         <View style={styles.locationDots}>
@@ -138,10 +407,11 @@ export default function HomeScreen() {
             <Text
               style={[
                 styles.locationInputText,
-                !startLocation && styles.locationInputPlaceholder,
+                !startLocation.address && styles.locationInputPlaceholder,
               ]}
+              numberOfLines={1}
             >
-              {startLocation || 'Pickup Location'}
+              {startLocation.address || 'Pickup Location'}
             </Text>
           </TouchableOpacity>
 
@@ -153,10 +423,11 @@ export default function HomeScreen() {
             <Text
               style={[
                 styles.locationInputText,
-                !destLocation && styles.locationInputPlaceholder,
+                !destLocation.address && styles.locationInputPlaceholder,
               ]}
+              numberOfLines={1}
             >
-              {destLocation || 'Drop-off Location'}
+              {destLocation.address || 'Drop-off Location'}
             </Text>
           </TouchableOpacity>
         </View>
@@ -213,7 +484,21 @@ export default function HomeScreen() {
       <View style={styles.recentRides}>
         <Text style={styles.sectionTitle}>Recent Routes</Text>
         
-        <TouchableOpacity style={styles.recentRideCard}>
+        <TouchableOpacity 
+          style={styles.recentRideCard}
+          onPress={() => {
+            setStartLocation({
+              address: '123 Main St, San Francisco',
+              lat: 37.7749,
+              lng: -122.4194,
+            });
+            setDestLocation({
+              address: '456 Market St, San Francisco',
+              lat: 37.7849,
+              lng: -122.4094,
+            });
+          }}
+        >
           <View style={styles.recentRideIcon}>
             <Ionicons name="time-outline" size={20} color="#6b7280" />
           </View>
@@ -226,7 +511,21 @@ export default function HomeScreen() {
           <Ionicons name="chevron-forward" size={20} color="#d1d5db" />
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.recentRideCard}>
+        <TouchableOpacity 
+          style={styles.recentRideCard}
+          onPress={() => {
+            setStartLocation({
+              address: '456 Market St, San Francisco',
+              lat: 37.7849,
+              lng: -122.4094,
+            });
+            setDestLocation({
+              address: '789 Fitness Ave, San Francisco',
+              lat: 37.7949,
+              lng: -122.3994,
+            });
+          }}
+        >
           <View style={styles.recentRideIcon}>
             <Ionicons name="time-outline" size={20} color="#6b7280" />
           </View>
@@ -430,5 +729,64 @@ const styles = StyleSheet.create({
   recentRideAddress: {
     fontSize: 14,
     color: '#6b7280',
+  },
+  requirementsBanner: {
+    flexDirection: 'row',
+    backgroundColor: '#fffbeb',
+    padding: 16,
+    marginHorizontal: 16,
+    marginBottom: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#fef3c7',
+    gap: 12,
+  },
+  requirementsContent: {
+    flex: 1,
+  },
+  requirementsTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#92400e',
+    marginBottom: 4,
+  },
+  requirementsText: {
+    fontSize: 14,
+    color: '#78350f',
+    lineHeight: 20,
+    marginBottom: 8,
+  },
+  requirementsList: {
+    gap: 6,
+    marginBottom: 12,
+  },
+  requirementItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  requirementItemText: {
+    fontSize: 14,
+    color: '#78350f',
+  },
+  setupButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    gap: 4,
+    paddingVertical: 6,
+  },
+  setupButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#f59e0b',
+  },
+  setupButtonDanger: {
+    // For rejected/expired states
+  },
+  setupButtonTextDanger: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#ef4444',
   },
 });

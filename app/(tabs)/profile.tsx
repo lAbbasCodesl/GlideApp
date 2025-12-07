@@ -92,56 +92,17 @@ export default function ProfileScreen() {
           <Text style={styles.menuText}>My Rides</Text>
           <Ionicons name="chevron-forward" size={20} color="#d1d5db" />
         </TouchableOpacity>
-
-        <TouchableOpacity
+                <TouchableOpacity
           style={styles.menuItem}
-          onPress={() => router.push('/payment/history')}
+          onPress={() => router.push('/payment/setup')}
         >
           <View style={styles.menuIconContainer}>
-            <Ionicons name="wallet-outline" size={20} color="#f59e0b" />
+            <Ionicons name="wallet-outline" size={20} color="#ef4444" />
           </View>
-          <Text style={styles.menuText}>Payment History</Text>
+          <Text style={styles.menuText}>Payment Methods</Text>
           <Ionicons name="chevron-forward" size={20} color="#d1d5db" />
         </TouchableOpacity>
-      </View>
 
-      {/* Driver Section */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Driver</Text>
-        
-        {userProfile?.isDriver ? (
-          <>
-            <TouchableOpacity
-              style={styles.menuItem}
-              onPress={() => router.push('/driver/setup')}
-            >
-              <View style={styles.menuIconContainer}>
-                <Ionicons name="car-sport-outline" size={20} color="#8b5cf6" />
-              </View>
-              <Text style={styles.menuText}>Vehicle Details</Text>
-              <Ionicons name="chevron-forward" size={20} color="#d1d5db" />
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.menuItem}
-              onPress={() => router.push('/driver/earnings')}
-            >
-              <View style={styles.menuIconContainer}>
-                <Ionicons name="cash-outline" size={20} color="#10b981" />
-              </View>
-              <Text style={styles.menuText}>Earnings</Text>
-              <Ionicons name="chevron-forward" size={20} color="#d1d5db" />
-            </TouchableOpacity>
-          </>
-        ) : (
-          <TouchableOpacity
-            style={styles.becomeDriverButton}
-            onPress={() => router.push('/driver/setup')}
-          >
-            <Ionicons name="car-outline" size={24} color="#fff" />
-            <Text style={styles.becomeDriverText}>Become a Driver</Text>
-          </TouchableOpacity>
-        )}
       </View>
 
       {/* Settings */}
@@ -159,17 +120,17 @@ export default function ProfileScreen() {
           <Ionicons name="chevron-forward" size={20} color="#d1d5db" />
         </TouchableOpacity>
 
+
         <TouchableOpacity
           style={styles.menuItem}
-          onPress={() => router.push('/settings/privacy')}
-        >
+          onPress={() => router.push('/settings/saved-locations')}
+        > 
           <View style={styles.menuIconContainer}>
-            <Ionicons name="lock-closed-outline" size={20} color="#ef4444" />
+            <Ionicons name="location-outline" size={20} color="#5582daff" />
           </View>
-          <Text style={styles.menuText}>Privacy & Security</Text>
+          <Text style={styles.menuText}>Saved Locations</Text>
           <Ionicons name="chevron-forward" size={20} color="#d1d5db" />
         </TouchableOpacity>
-
         <TouchableOpacity
           style={styles.menuItem}
           onPress={() => router.push('/settings/help')}
