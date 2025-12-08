@@ -12,13 +12,18 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../contexts/AuthContext';
 import { RefreshControl } from 'react-native';
-import { canUseRideFeatures } from '../../types/user';
+import { calculateRidePrice, canUseRideFeatures } from '../../types/user';
+import { useSchedule } from '../../hooks/useSchedule';
+import { useRide } from '../../hooks/useRide';
 
 export default function HomeScreen() {
-  const { userProfile,refreshUserProfile } = useAuth();
+  const { user,userProfile,refreshUserProfile } = useAuth();
   const router = useRouter();
   const params = useLocalSearchParams();
   const [refreshing, setRefreshing] = useState(false);
+  const { schedule, loadSchedule, hasSchedule } = useSchedule();
+  const { create: createRide, search: searchRides, loading: rideLoading } = useRide();
+
 
   // Location state
   const [startLocation, setStartLocation] = useState({
@@ -55,6 +60,9 @@ export default function HomeScreen() {
       });
     }
   }, [params.startAddress, params.startLat, params.startLng, params.destAddress, params.destLat, params.destLng]);
+  useEffect(() => {
+    loadSchedule();
+  }, []);
 
   const handleLocationSelect = (type: 'start' | 'dest') => {
     router.push({
@@ -73,148 +81,263 @@ export default function HomeScreen() {
     });
   };
 
-const handleSearch = () => {
-  if (!startLocation.address || !destLocation.address) {
-    alert('Please enter both pickup and drop-off locations');
-    return;
-  }
+const handleSearch = async () => {
+    if (!startLocation.address || !destLocation.address) {
+      alert('Please enter both pickup and drop-off locations');
+      return;
+    }
 
-  // CHECK PAYMENT METHODS FIRST
-  if (!userProfile?.paymentMethods || !canUseRideFeatures(userProfile)) {
-    Alert.alert(
-      'Payment Method Required',
-      'Please add at least one payment method before searching for rides.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Add Payment Method',
-          onPress: () => router.push('/payment/setup'),
-        },
-      ]
-    );
-    return;
-  }
-
-  // Check if user is trying to offer a ride
-  if (selectedMode === 'offer') {
-    // Check if user has vehicle
-    if (!userProfile?.vehicle) {
+    // Payment method check (existing)
+    if (!userProfile?.paymentMethods || !canUseRideFeatures(userProfile)) {
       Alert.alert(
-        'Vehicle Required',
-        'To offer rides, you need to add your vehicle first.',
+        'Payment Method Required',
+        'Please add at least one payment method before searching for rides.',
         [
           { text: 'Cancel', style: 'cancel' },
           {
-            text: 'Add Vehicle',
-            onPress: () => router.push('/vehicle/add'),
+            text: 'Add Payment Method',
+            onPress: () => router.push('/payment/setup'),
           },
         ]
       );
       return;
     }
 
-    // Check if user has license
-    if (!userProfile?.license) {
-      Alert.alert(
-        'Driver\'s License Required',
-        'To offer rides, you need to upload your driver\'s license for verification.',
-        [
-          { text: 'Cancel', style: 'cancel' },
-          {
-            text: 'Add License',
-            onPress: () => router.push('/license/add'),
-          },
-        ]
-      );
-      return;
-    }
+    if (selectedMode === 'offer') {
+      // DRIVER MODE
+      // Check vehicle and license (existing checks)
+      if (!userProfile?.vehicle) {
+        Alert.alert(
+          'Vehicle Required',
+          'To offer rides, you need to add your vehicle first.',
+          [
+            { text: 'Cancel', style: 'cancel' },
+            {
+              text: 'Add Vehicle',
+              onPress: () => router.push('/vehicle/add'),
+            },
+          ]
+        );
+        return;
+      }
 
-    // Check license verification status
-    if (userProfile.license.verificationStatus === 'rejected') {
-      Alert.alert(
-        'License Verification Failed',
+      if (!userProfile?.license) {
+        Alert.alert(
+          'Driver\'s License Required',
+          'To offer rides, you need to upload your driver\'s license for verification.',
+          [
+            { text: 'Cancel', style: 'cancel' },
+            {
+              text: 'Add License',
+              onPress: () => router.push('/license/add'),
+            },
+          ]
+        );
+        return;
+      }
+
+      // Check for license issues (existing checks)
+      if (userProfile.license.verificationStatus === 'rejected') {
+        Alert.alert(
+          'License Verification Failed',
         userProfile.license.rejectionReason || 'Your license was not approved. Please update and resubmit.',
-        [
-          { text: 'Cancel', style: 'cancel' },
-          {
-            text: 'Update License',
-            onPress: () => router.push({
-              pathname: '/license/add',
-              params: { edit: 'true' },
-            }),
-          },
-        ]
-      );
-      return;
-    }
+          [
+            { text: 'Cancel', style: 'cancel' },
+            {
+              text: 'Update License',
+              onPress: () => router.push({
+                pathname: '/license/add',
+                params: { edit: 'true' },
+              }),
+            },
+          ]
+        );
+        return;
+      }
 
-    if (userProfile.license.verificationStatus === 'expired') {
-      Alert.alert(
-        'License Expired',
+      if (userProfile.license.verificationStatus === 'expired') {
+        Alert.alert(
+          'License Expired',
         'Your driver\'s license has expired. Please update it to continue offering rides.',
-        [
-          { text: 'Cancel', style: 'cancel' },
-          {
-            text: 'Update License',
-            onPress: () => router.push({
-              pathname: '/license/add',
-              params: { edit: 'true' },
-            }),
-          },
-        ]
-      );
-      return;
+          [
+            { text: 'Cancel', style: 'cancel' },
+            {
+              text: 'Update License',
+              onPress: () => router.push({
+                pathname: '/license/add',
+                params: { edit: 'true' },
+              }),
+            },
+          ]
+        );
+        return;
+      }
+
+      // ✅ NEW: Check for schedule
+      if (!hasSchedule) {
+        // No schedule - ask if they want to create one
+        Alert.alert(
+          'Create Recurring Schedule?',
+          'Do you regularly offer rides on this route? Set up a schedule to automatically match with riders.',
+          [
+            {
+              text: 'Not Now',
+              style: 'cancel',
+              onPress: () => createDriverRide(), // Create one-time ride
+            },
+            {
+              text: 'Create Schedule',
+              onPress: () => {
+                // Go to schedule screen, then create ride
+                router.push({
+                  pathname: '/ride/schedule',
+                  params: {
+                    type: 'driver',
+                    startAddress: startLocation.address,
+                    startLat: startLocation.lat?.toString() || '0',
+                    startLng: startLocation.lng?.toString() || '0',
+                    destAddress: destLocation.address,
+                    destLat: destLocation.lat?.toString() || '0',
+                    destLng: destLocation.lng?.toString() || '0',
+                    returnAction: 'createRide', // Signal to create ride after schedule
+                  },
+                });
+              },
+            },
+          ]
+        );
+      } else {
+        // Has schedule - just create ride
+        createDriverRide();
+      }
+    } else {
+      // RIDER MODE
+      // ✅ NEW: Check for schedule
+      if (!hasSchedule) {
+        // No schedule - ask if they want to create one
+        Alert.alert(
+          'Create Recurring Schedule?',
+          'Do you regularly need rides on this route? Set up a schedule to get automatic matches.',
+          [
+            {
+              text: 'Not Now',
+              style: 'cancel',
+              onPress: () => searchRiderRides(), // Search one-time
+            },
+            {
+              text: 'Create Schedule',
+              onPress: () => {
+                // Go to schedule screen, then search
+                router.push({
+                  pathname: '/ride/schedule',
+                  params: {
+                    type: 'rider',
+                    startAddress: startLocation.address,
+                    startLat: startLocation.lat?.toString() || '0',
+                    startLng: startLocation.lng?.toString() || '0',
+                    destAddress: destLocation.address,
+                    destLat: destLocation.lat?.toString() || '0',
+                    destLng: destLocation.lng?.toString() || '0',
+                    returnAction: 'searchRides', // Signal to search after schedule
+                  },
+                });
+              },
+            },
+          ]
+        );
+      } else {
+        // Has schedule - just search
+        searchRiderRides();
+      }
     }
-
-    // If pending or approved, allow them to continue
-    if (userProfile.license.verificationStatus === 'pending') {
-      Alert.alert(
-        'Verification Pending',
-        'Your license is being verified. You can still offer rides while it is pending',
-        [
-          { text: 'Cancel', style: 'cancel' },
-          { text: 'Continue Anyway', onPress: () => createRide() },
-        ]
-      );
-      return;
-    }
-
-    // License approved - proceed
-    createRide();
-  } else {
-    // Find ride mode - just need payment method (already checked)
-    searchRides();
-  }
-};
-
-  const searchRides = () => {
-    router.push({
-      pathname: '/search-results',
-      params: {
-        startLat: startLocation.lat?.toString() || '37.7749',
-        startLng: startLocation.lng?.toString() || '-122.4194',
-        destLat: destLocation.lat?.toString() || '37.8044',
-        destLng: destLocation.lng?.toString() || '-122.2712',
-        startAddress: startLocation.address,
-        destAddress: destLocation.address,
-        mode: 'rider',
-      },
-    });
   };
 
-  const createRide = () => {
-    router.push({
-      pathname: '/search-results',
-      params: {
-        startLat: startLocation.lat?.toString() || '37.7749',
-        startLng: startLocation.lng?.toString() || '-122.4194',
-        destLat: destLocation.lat?.toString() || '37.8044',
-        destLng: destLocation.lng?.toString() || '-122.2712',
-        startAddress: startLocation.address,
-        destAddress: destLocation.address,
-        mode: 'driver',
-      },
-    });
+    /**
+   * Create ride as driver
+   */
+  const createDriverRide = async () => {
+    try {
+      if (!userProfile?.vehicle) return;
+
+      // Calculate price based on distance
+      const distance = 10; // TODO: Calculate actual distance
+      const price = calculateRidePrice(distance, userProfile.vehicle.ratePerMile);
+
+      const ride = await createRide({
+        driverId: user!.uid,
+        driver: {
+          name: userProfile.displayName,
+          rating: userProfile.rating,
+          company: userProfile.company,
+          verified: false, // TODO: Driver verification status
+          phoneNumber: userProfile.phoneNumber,
+        },
+        startLocation: {
+          lat: startLocation.lat!,
+          lng: startLocation.lng!,
+          address: startLocation.address,
+        },
+        endLocation: {
+          lat: destLocation.lat!,
+          lng: destLocation.lng!,
+          address: destLocation.address,
+        },
+        departureTime: new Date(), // TODO: Let user select time
+        pricePerSeat: price,
+        totalSeats: 2, // TODO: Let driver choose 1-2
+        availableSeats: 2,
+        vehicle: userProfile.vehicle,
+        status: 'scheduled',
+        isRecurring: false, // Manual search = one-time
+        scheduleId: schedule?.id, // Link to schedule if exists
+      });
+
+      // Navigate to search results to invite riders
+      router.push({
+        pathname: '/search-results',
+        params: {
+          rideId: ride.id,
+          mode: 'driver',
+          startAddress: startLocation.address,
+          destAddress: destLocation.address,
+        },
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to create ride';
+      Alert.alert('Error', message);
+    }
+  };
+
+  /**
+   * Search for rides as rider
+   */
+  const searchRiderRides = async () => {
+    try {
+      const rides = await searchRides(
+        startLocation.lat!,
+        startLocation.lng!,
+        destLocation.lat!,
+        destLocation.lng!,
+        new Date() // TODO: Let user select time
+      );
+
+      // Navigate to search results
+      router.push({
+        pathname: '/search-results',
+        params: {
+          mode: 'rider',
+          startAddress: startLocation.address,
+          destAddress: destLocation.address,
+          startLat: startLocation.lat?.toString() || '0',
+          startLng: startLocation.lng?.toString() || '0',
+          destLat: destLocation.lat?.toString() || '0',
+          destLng: destLocation.lng?.toString() || '0',
+        },
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to search rides';
+      Alert.alert('Error', message);
+    }
   };
 
   const onRefresh = async () => {
