@@ -15,6 +15,7 @@ import { RefreshControl } from 'react-native';
 import { calculateRidePrice, canUseRideFeatures } from '../../types/user';
 import { useSchedule } from '../../hooks/useSchedule';
 import { useRide } from '../../hooks/useRide';
+import { RideSearch, isSearchActive, formatTimeWindow } from '../../types/rideSearch';
 
 export default function HomeScreen() {
   const { user,userProfile,refreshUserProfile } = useAuth();
@@ -23,6 +24,8 @@ export default function HomeScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const { schedule, loadSchedule, hasSchedule } = useSchedule();
   const { create: createRide, search: searchRides, loading: rideLoading } = useRide();
+  const [activeSearches, setActiveSearches] = useState<RideSearch[]>([]);
+
 
 
   // Location state
@@ -63,6 +66,42 @@ export default function HomeScreen() {
   useEffect(() => {
     loadSchedule();
   }, []);
+  useEffect(() => {
+  loadActiveSearches();
+}, []);
+
+const loadActiveSearches = async () => {
+  if (!user) return;
+  try {
+    const searches = await getTodaysRideSearches(user.uid);
+    setActiveSearches(searches.filter(isSearchActive));
+  } catch (error) {
+    console.error('Failed to load active searches:', error);
+  }
+};
+
+const handleCancelSearch = async (searchId: string) => {
+  Alert.alert(
+    'Cancel Search?',
+    'This will cancel your active ride search',
+    [
+      { text: 'No', style: 'cancel' },
+      {
+        text: 'Yes, Cancel',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await cancelRideSearch(searchId);
+            await loadActiveSearches();
+            Alert.alert('Search cancelled');
+          } catch (error) {
+            Alert.alert('Error', 'Failed to cancel search');
+          }
+        },
+      },
+    ]
+  );
+};
 
   const handleLocationSelect = (type: 'start' | 'dest') => {
     router.push({
@@ -410,6 +449,76 @@ const handleSearch = async () => {
           </Text>
         </TouchableOpacity>
       </View>
+      {activeSearches.length > 0 && (
+  <View style={styles.activeSearchesSection}>
+    <View style={styles.activeSearchesHeader}>
+      <Text style={styles.activeSearchesTitle}>
+        Today's Active Searches ({activeSearches.length})
+      </Text>
+      <TouchableOpacity onPress={loadActiveSearches}>
+        <Ionicons name="refresh" size={20} color="#6b7280" />
+      </TouchableOpacity>
+    </View>
+    
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      style={styles.activeSearchesList}
+    >
+      {activeSearches.map((search) => (
+        <View key={search.id} style={styles.activeSearchCard}>
+          <View style={styles.searchCardHeader}>
+            <View style={styles.searchTypeTag}>
+              <Ionicons
+                name={search.type === 'driver' ? 'car' : 'person'}
+                size={14}
+                color={search.type === 'driver' ? '#2563eb' : '#10b981'}
+              />
+              <Text style={styles.searchTypeText}>
+                {search.type === 'driver' ? 'Offering' : 'Looking'}
+              </Text>
+            </View>
+            {search.isAutomatic && (
+              <View style={styles.autoTag}>
+                <Ionicons name="sync" size={12} color="#f59e0b" />
+              </View>
+            )}
+          </View>
+          
+          <View style={styles.searchRoute}>
+            <Text style={styles.searchAddress} numberOfLines={1}>
+              {search.startLocation.address.split(',')[0]}
+            </Text>
+            <Ionicons name="arrow-forward" size={14} color="#9ca3af" />
+            <Text style={styles.searchAddress} numberOfLines={1}>
+              {search.endLocation.address.split(',')[0]}
+            </Text>
+          </View>
+          
+          <Text style={styles.searchTime}>
+            {formatTimeWindow(search)}
+          </Text>
+          
+          {search.status === 'matched' && search.confirmedRideId ? (
+            <TouchableOpacity
+              style={styles.viewRideButton}
+              onPress={() => router.push(`/ride/confirmed/${search.confirmedRideId}`)}
+            >
+              <Text style={styles.viewRideText}>View Ride</Text>
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity
+              style={styles.cancelSearchButton}
+              onPress={() => handleCancelSearch(search.id)}
+            >
+              <Text style={styles.cancelSearchText}>Cancel</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      ))}
+    </ScrollView>
+  </View>
+)}
 
 {/* Driver Requirements Banner */}
 {selectedMode === "offer" && (() => {
@@ -912,4 +1021,103 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#ef4444',
   },
+  activeSearchesSection: {
+  backgroundColor: '#fff',
+  paddingVertical: 16,
+  borderBottomWidth: 1,
+  borderBottomColor: '#e5e7eb',
+},
+activeSearchesHeader: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  paddingHorizontal: 20,
+  marginBottom: 12,
+},
+activeSearchesTitle: {
+  fontSize: 16,
+  fontWeight: '600',
+  color: '#111827',
+},
+activeSearchesList: {
+  paddingHorizontal: 16,
+},
+activeSearchCard: {
+  width: 240,
+  backgroundColor: '#f9fafb',
+  padding: 16,
+  borderRadius: 12,
+  marginHorizontal: 4,
+  borderWidth: 1,
+  borderColor: '#e5e7eb',
+},
+searchCardHeader: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  marginBottom: 12,
+},
+searchTypeTag: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  backgroundColor: '#fff',
+  paddingHorizontal: 8,
+  paddingVertical: 4,
+  borderRadius: 6,
+  gap: 4,
+},
+searchTypeText: {
+  fontSize: 12,
+  fontWeight: '600',
+  color: '#374151',
+},
+autoTag: {
+  width: 20,
+  height: 20,
+  borderRadius: 10,
+  backgroundColor: '#fffbeb',
+  justifyContent: 'center',
+  alignItems: 'center',
+},
+searchRoute: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  gap: 8,
+  marginBottom: 8,
+},
+searchAddress: {
+  flex: 1,
+  fontSize: 13,
+  color: '#374151',
+  fontWeight: '500',
+},
+searchTime: {
+  fontSize: 13,
+  color: '#6b7280',
+  marginBottom: 12,
+},
+viewRideButton: {
+  backgroundColor: '#2563eb',
+  paddingVertical: 8,
+  borderRadius: 8,
+  alignItems: 'center',
+},
+viewRideText: {
+  fontSize: 13,
+  fontWeight: '600',
+  color: '#fff',
+},
+cancelSearchButton: {
+  backgroundColor: '#fff',
+  paddingVertical: 8,
+  borderRadius: 8,
+  alignItems: 'center',
+  borderWidth: 1,
+  borderColor: '#d1d5db',
+},
+cancelSearchText: {
+  fontSize: 13,
+  fontWeight: '600',
+  color: '#6b7280',
+}
 });

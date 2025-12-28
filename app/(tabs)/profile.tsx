@@ -92,7 +92,17 @@ export default function ProfileScreen() {
           <Text style={styles.menuText}>My Rides</Text>
           <Ionicons name="chevron-forward" size={20} color="#d1d5db" />
         </TouchableOpacity>
-                <TouchableOpacity
+        <TouchableOpacity
+          style={styles.menuItem}
+          onPress={() => router.push('/profile/my-schedule')}
+        >
+          <View style={styles.menuIconContainer}>
+            <Ionicons name="calendar-outline" size={20} color="#8b5cf6" />
+          </View>
+          <Text style={styles.menuText}>My Schedule</Text>
+          <Ionicons name="chevron-forward" size={20} color="#d1d5db" />
+        </TouchableOpacity>
+        <TouchableOpacity
           style={styles.menuItem}
           onPress={() => router.push('/payment/setup')}
         >

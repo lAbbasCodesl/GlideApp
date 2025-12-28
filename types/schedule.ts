@@ -16,19 +16,18 @@ export interface Location {
 /**
  * User's recurring schedule
  * Can be for offering rides (driver) or taking rides (rider)
+ * Supports both outbound (to work) and return (from work) trips
  */
 export interface Schedule {
   id: string;
   userId: string;
   type: 'driver' | 'rider';  // Is this person offering or looking for rides?
   
-  // Route info
-  startLocation: Location;
-  endLocation: Location;
+  // Outbound trip (e.g., Home → Work)
+  outbound: ScheduleTrip;
   
-  // Timing
-  departureTime: string;  // Format: "HH:mm" (24-hour)
-  daysOfWeek: DayOfWeek[];
+  // Return trip (e.g., Work → Home) - optional
+  return?: ScheduleTrip;
   
   // Settings
   active: boolean;        // Can temporarily disable without deleting
@@ -37,6 +36,17 @@ export interface Schedule {
   // Metadata
   createdAt: Date;
   updatedAt: Date;
+}
+
+/**
+ * A single trip (outbound or return)
+ */
+export interface ScheduleTrip {
+  startLocation: Location;
+  endLocation: Location;
+  departureTime: string;  // Format: "HH:mm" (24-hour)
+  daysOfWeek: DayOfWeek[];
+  timeWindow: number;  // Minutes (+/- for matching), default 30
 }
 
 /**
@@ -97,17 +107,40 @@ export const ALL_DAYS: DayOfWeek[] = [
 /**
  * Check if schedule is active today
  */
-export const isScheduleActiveToday = (schedule: Schedule): boolean => {
+export const isScheduleActiveToday = (schedule: Schedule, tripType: 'outbound' | 'return'): boolean => {
   if (!schedule.active) return false;
   
+  const trip = tripType === 'outbound' ? schedule.outbound : schedule.return;
+  if (!trip) return false;
+  
   const today = new Date().toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase() as DayOfWeek;
-  return schedule.daysOfWeek.includes(today);
+  return trip.daysOfWeek.includes(today);
+};
+
+/**
+ * Get formatted schedule summary
+ */
+export const getScheduleSummary = (schedule: Schedule): string => {
+  const outboundDays = schedule.outbound.daysOfWeek.length;
+  const returnDays = schedule.return?.daysOfWeek.length || 0;
+  
+  const summary = [];
+  
+  if (outboundDays > 0) {
+    summary.push(`${outboundDays} ${outboundDays === 1 ? 'day' : 'days'} outbound`);
+  }
+  
+  if (returnDays > 0) {
+    summary.push(`${returnDays} ${returnDays === 1 ? 'day' : 'days'} return`);
+  }
+  
+  return summary.join(', ') || 'No days selected';
 };
 
 /**
  * Check if two schedules overlap (same route, similar time)
  */
-export const schedulesOverlap = (s1: Schedule, s2: Schedule): boolean => {
+export const schedulesOverlap = (s1: ScheduleTrip, s2: ScheduleTrip): boolean => {
   // Check if routes are similar (within 1km)
   const startDistance = calculateDistance(
     s1.startLocation.lat,
@@ -125,7 +158,7 @@ export const schedulesOverlap = (s1: Schedule, s2: Schedule): boolean => {
   
   if (startDistance > 1 || endDistance > 1) return false;
   
-  // Check if times are within 30 minutes
+  // Check if times are within combined time windows
   const [h1, m1] = s1.departureTime.split(':').map(Number);
   const [h2, m2] = s2.departureTime.split(':').map(Number);
   
@@ -133,7 +166,9 @@ export const schedulesOverlap = (s1: Schedule, s2: Schedule): boolean => {
   const minutes2 = h2 * 60 + m2;
   
   const timeDiff = Math.abs(minutes1 - minutes2);
-  if (timeDiff > 30) return false;
+  const maxWindow = s1.timeWindow + s2.timeWindow;
+  
+  if (timeDiff > maxWindow) return false;
   
   // Check if they share any days
   const sharedDays = s1.daysOfWeek.filter(day => s2.daysOfWeek.includes(day));
