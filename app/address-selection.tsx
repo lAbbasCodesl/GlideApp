@@ -44,13 +44,13 @@ export default function AddressSelectionScreen() {
   const params = useLocalSearchParams<{ 
     type: 'start' | 'dest';
     returnTo?: string;
-    // Preserve existing location params
     currentStartAddress?: string;
     currentStartLat?: string;
     currentStartLng?: string;
     currentDestAddress?: string;
     currentDestLat?: string;
     currentDestLng?: string;
+    [key: string]: string | undefined; 
   }>();
   
   const [searchQuery, setSearchQuery] = useState('');
@@ -201,49 +201,39 @@ export default function AddressSelectionScreen() {
   /**
    * Handle location selection and navigate back
    */
-  const handleLocationSelect = async (location: SelectedLocation) => {
-    console.log('Selected location:', location);
-    
-    // Save to recent locations cache
+const handleLocationSelect = async (location: SelectedLocation) => {
     try {
       await addRecentLocation(location.address, location.lat, location.lng);
-    } catch (error) {
-      console.error('Error saving to recent:', error);
-      // Don't block navigation on cache error
-    }
+    } catch (e) { console.error('Error saving to recent:', e); }
     
-    // Build params that preserve existing locations
-    const navigationParams: any = {};
+    // PRODUCTION PATTERN: Spread all existing params to prevent data loss
+    const navigationParams: any = { ...params };
     
     if (params.type === 'start') {
-      // Updating start location - preserve dest
       navigationParams.startAddress = location.address;
       navigationParams.startLat = location.lat.toString();
       navigationParams.startLng = location.lng.toString();
-      
-      // Preserve existing dest location if it exists
+      // Ensure existing destination isn't lost
       if (params.currentDestAddress) {
         navigationParams.destAddress = params.currentDestAddress;
         navigationParams.destLat = params.currentDestLat;
         navigationParams.destLng = params.currentDestLng;
       }
     } else {
-      // Updating dest location - preserve start
       navigationParams.destAddress = location.address;
       navigationParams.destLat = location.lat.toString();
       navigationParams.destLng = location.lng.toString();
-      
-      // Preserve existing start location if it exists
+      // Ensure existing pickup isn't lost
       if (params.currentStartAddress) {
         navigationParams.startAddress = params.currentStartAddress;
         navigationParams.startLat = params.currentStartLat;
         navigationParams.startLng = params.currentStartLng;
       }
     }
-    
-    // Navigate back with all params
+
     if (params.returnTo) {
-      router.push({
+      // Use replace to avoid stacking screens and messing up the back button
+      router.replace({
         pathname: params.returnTo as any,
         params: navigationParams,
       });

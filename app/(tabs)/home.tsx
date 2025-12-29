@@ -47,6 +47,8 @@ export default function HomeScreen() {
   // Listen for address updates from address-selection screen
   useEffect(() => {
     // Check for start location update
+    console.log(params.selectedMode)
+    if (params.selectedMode) setSelectedMode(params.selectedMode as 'find' | 'offer');
     if (params.startAddress && params.startAddress !== startLocation.address) {
       setStartLocation({
         address: params.startAddress as string,
@@ -63,7 +65,7 @@ export default function HomeScreen() {
         lng: params.destLng ? parseFloat(params.destLng as string) : null,
       });
     }
-  }, [params.startAddress, params.startLat, params.startLng, params.destAddress, params.destLat, params.destLng]);
+  }, [params.startAddress, params.startLat, params.startLng, params.destAddress, params.destLat, params.destLng, params.selectedMode]);
   useEffect(() => {
     loadSchedule();
   }, []);
@@ -105,7 +107,7 @@ const handleCancelSearch = async (searchId: string) => {
 };
 
   const handleLocationSelect = (type: 'start' | 'dest') => {
-    router.push({
+    router.replace({
       pathname: '/address-selection',
       params: { 
         type, 
@@ -117,6 +119,7 @@ const handleCancelSearch = async (searchId: string) => {
         currentDestAddress: destLocation.address || undefined,
         currentDestLat: destLocation.lat?.toString() || undefined,
         currentDestLng: destLocation.lng?.toString() || undefined,
+        selectedMode: selectedMode || undefined,
       },
     });
   };
@@ -232,7 +235,7 @@ const handleSearch = async () => {
                 router.push({
                   pathname: '/ride/schedule',
                   params: {
-                    type: 'driver',
+                    scheduleType: 'driver',
                     startAddress: startLocation.address,
                     startLat: startLocation.lat?.toString() || '0',
                     startLng: startLocation.lng?.toString() || '0',
@@ -271,7 +274,7 @@ const handleSearch = async () => {
                 router.push({
                   pathname: '/ride/schedule',
                   params: {
-                    type: 'rider',
+                    scheduleType: 'rider',
                     startAddress: startLocation.address,
                     startLat: startLocation.lat?.toString() || '0',
                     startLng: startLocation.lng?.toString() || '0',

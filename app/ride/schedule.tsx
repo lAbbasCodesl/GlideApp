@@ -32,7 +32,6 @@ import { ALL_DAYS, DayOfWeek, getShortDayName, formatTime12Hour } from '../../ty
 export default function ScheduleScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{
-    type: 'driver' | 'rider';
     startAddress?: string;
     startLat?: string;
     startLng?: string;
@@ -81,28 +80,52 @@ const [autoSearch, setAutoSearch] = useState(params.autoSearch ? params.autoSear
   const [timePickerFor, setTimePickerFor] = useState<'outbound' | 'return'>('outbound');
   const [tempTime, setTempTime] = useState(new Date());
 
-  // Initialize with existing schedule
-  useEffect(() => {
-    if (schedule) {
-        console.log(schedule)
-      setSelectedDays(schedule.outbound.daysOfWeek);
-      setOutboundTime(schedule.outbound.departureTime);
-      setTimeWindow(schedule.outbound.timeWindow);
-      setAutoSearch(schedule.autoSearch);
+//   // Initialize with existing schedule
+//   useEffect(() => {
+//     if (schedule) {
+//         console.log(schedule.type);
+//         params.type = schedule.type; 
+//       setSelectedDays(schedule.outbound.daysOfWeek);
+//       setOutboundTime(schedule.outbound.departureTime);
+//       setTimeWindow(schedule.outbound.timeWindow);
+//       setAutoSearch(schedule.autoSearch);
       
-      if (schedule.return) {
-        setReturnTime(schedule.return.departureTime);
-      }
+//       if (schedule.return) {
+//         setReturnTime(schedule.return.departureTime);
+//       }
       
-      // Load addresses from schedule
-      setStartAddress(schedule.outbound.startLocation.address);
-      setStartLat(schedule.outbound.startLocation.lat.toString());
-      setStartLng(schedule.outbound.startLocation.lng.toString());
-      setDestAddress(schedule.outbound.endLocation.address);
-      setDestLat(schedule.outbound.endLocation.lat.toString());
-      setDestLng(schedule.outbound.endLocation.lng.toString());
-    }
-  }, [schedule]);
+//       // Load addresses from schedule
+//       setStartAddress(schedule.outbound.startLocation.address);
+//       setStartLat(schedule.outbound.startLocation.lat.toString());
+//       setStartLng(schedule.outbound.startLocation.lng.toString());
+//       setDestAddress(schedule.outbound.endLocation.address);
+//       setDestLat(schedule.outbound.endLocation.lat.toString());
+//       setDestLng(schedule.outbound.endLocation.lng.toString());
+//     }
+//   }, [schedule]);
+//   useEffect(() => {
+//     // Update Locations
+//     if (params.startAddress) setStartAddress(params.startAddress);
+//     if (params.startLat) setStartLat(params.startLat);
+//     if (params.startLng) setStartLng(params.startLng);
+//     if (params.destAddress) setDestAddress(params.destAddress);
+//     if (params.destLat) setDestLat(params.destLat);
+//     if (params.destLng) setDestLng(params.destLng);
+
+//     // Update Schedule Settings (if they exist in params)
+//     if (params.selectedDays) {
+//       try {
+//         setSelectedDays(JSON.parse(params.selectedDays as string));
+//       } catch (e) {
+//         // ignore error
+//       }
+//     }
+//     if (params.outboundTime) setOutboundTime(params.outboundTime as string);
+//     if (params.returnTime) setReturnTime(params.returnTime as string);
+//     if (params.timeWindow) setTimeWindow(parseInt(params.timeWindow as string));
+//     if (params.autoSearch) setAutoSearch(params.autoSearch === 'true');
+    
+//   }, [params]);
 
 
   const toggleDay = (day: DayOfWeek) => {
@@ -155,7 +178,7 @@ const [autoSearch, setAutoSearch] = useState(params.autoSearch ? params.autoSear
 
     try {
       await createOrUpdateSchedule({
-        type: params.type as 'driver' | 'rider',
+        scheduleType: params.scheduleType as 'driver' | 'rider',
         outbound: {
           startLocation: {
             lat: parseFloat(startLat),
@@ -251,7 +274,7 @@ const [autoSearch, setAutoSearch] = useState(params.autoSearch ? params.autoSear
           <View style={styles.infoBannerContent}>
             <Text style={styles.infoBannerTitle}>Set Your Regular Schedule</Text>
             <Text style={styles.infoBannerText}>
-              {params.type === 'driver'
+              {params.scheduleType === 'driver'
                 ? 'Let riders know when you regularly offer rides. Set your outbound and return times.'
                 : 'Tell us when you regularly need rides. Set your outbound and return times.'}
             </Text>
@@ -266,42 +289,42 @@ const [autoSearch, setAutoSearch] = useState(params.autoSearch ? params.autoSear
             <TouchableOpacity
               style={[
                 styles.typeButton,
-                params.type === 'driver' && styles.typeButtonActive,
+                params.scheduleType === 'rider' && styles.typeButtonActive,
               ]}
-              onPress={() => router.setParams({ type: 'driver' })}
+              onPress={() => router.setParams({ scheduleType: 'rider' })}
             >
-              <Ionicons 
-                name="car" 
-                size={20} 
-                color={params.type === 'driver' ? '#fff' : '#2563eb'} 
+              <Ionicons
+                name="person"
+                size={20}
+                color={params.scheduleType === 'rider' ? '#fff' : '#10b981'}
               />
               <Text style={[
                 styles.typeButtonText,
-                params.type === 'driver' && styles.typeButtonTextActive,
+                params.scheduleType === 'rider' && styles.typeButtonTextActive,
+              ]}>
+                Find Rides
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.typeButton,
+                params.scheduleType === 'driver' && styles.typeButtonActive,
+              ]}
+              onPress={() => router.setParams({ scheduleType: 'driver' })}
+            >
+              <Ionicons
+                name="car"
+                size={20}
+                color={params.scheduleType === 'driver' ? '#fff' : '#2563eb'}
+              />
+              <Text style={[
+                styles.typeButtonText,
+                params.scheduleType === 'driver' && styles.typeButtonTextActive,
               ]}>
                 Offer Rides
               </Text>
             </TouchableOpacity>
 
-            <TouchableOpacity
-              style={[
-                styles.typeButton,
-                params.type === 'rider' && styles.typeButtonActive,
-              ]}
-              onPress={() => router.setParams({ type: 'rider' })}
-            >
-              <Ionicons 
-                name="person" 
-                size={20} 
-                color={params.type === 'rider' ? '#fff' : '#10b981'} 
-              />
-              <Text style={[
-                styles.typeButtonText,
-                params.type === 'rider' && styles.typeButtonTextActive,
-              ]}>
-                Find Rides
-              </Text>
-            </TouchableOpacity>
           </View>
         </View>
 
@@ -319,7 +342,7 @@ const [autoSearch, setAutoSearch] = useState(params.autoSearch ? params.autoSear
               params: { 
                 type: 'start',
                 returnTo: '/ride/schedule',
-                scheduleType: params.type || 'rider',
+                scheduleType: params.scheduleType || 'rider',
                 // Pass ALL current state
                 currentStartAddress: startAddress,
                 currentStartLat: startLat,
@@ -353,7 +376,7 @@ const [autoSearch, setAutoSearch] = useState(params.autoSearch ? params.autoSear
               params: { 
                 type: 'dest',
                 returnTo: '/ride/schedule',
-                scheduleType: params.type || 'rider',
+                scheduleType: params.scheduleType || 'rider',
                 // Pass ALL current state
                 currentStartAddress: startAddress,
                 currentStartLat: startLat,
@@ -503,7 +526,7 @@ const [autoSearch, setAutoSearch] = useState(params.autoSearch ? params.autoSear
             <View style={styles.toggleInfo}>
               <Text style={styles.toggleTitle}>Automatic Matching</Text>
               <Text style={styles.toggleSubtitle}>
-                {params.type === 'driver'
+                {params.scheduleType === 'driver'
                   ? 'Automatically show your ride to matching riders'
                   : 'Automatically search for matching rides'}
               </Text>

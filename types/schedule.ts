@@ -21,7 +21,7 @@ export interface Location {
 export interface Schedule {
   id: string;
   userId: string;
-  type: 'driver' | 'rider';  // Is this person offering or looking for rides?
+  scheduleType: 'driver' | 'rider';  // Is this person offering or looking for rides?
   
   // Outbound trip (e.g., Home → Work)
   outbound: ScheduleTrip;

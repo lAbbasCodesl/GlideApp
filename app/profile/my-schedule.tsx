@@ -28,13 +28,19 @@ export default function MyScheduleScreen() {
     router.push({
       pathname: '/ride/schedule',
       params: {
-        type: schedule.type,
+        scheduleType: schedule.scheduleType,
         startAddress: schedule.outbound.startLocation.address,
         startLat: schedule.outbound.startLocation.lat.toString(),
         startLng: schedule.outbound.startLocation.lng.toString(),
         destAddress: schedule.outbound.endLocation.address,
         destLat: schedule.outbound.endLocation.lat.toString(),
         destLng: schedule.outbound.endLocation.lng.toString(),
+        selectedDays: JSON.stringify(schedule.outbound.daysOfWeek),
+        outboundTime: schedule.outbound.departureTime,
+        returnTime: schedule.return.departureTime,
+        timeWindow: schedule.outbound.timeWindow.toString(),
+        autoSearch: schedule.autoSearch.toString(),
+
       },
     });
   };
@@ -250,7 +256,7 @@ export default function MyScheduleScreen() {
             <View style={styles.settingInfo}>
               <Text style={styles.settingLabel}>Schedule Type</Text>
               <Text style={styles.settingValue}>
-                {schedule!.type === 'driver' ? 'Offering Rides' : 'Looking for Rides'}
+                {schedule!.scheduleType === 'driver' ? 'Offering Rides' : 'Looking for Rides'}
               </Text>
             </View>
           </View>
