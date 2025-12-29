@@ -33,23 +33,48 @@ export default function ScheduleScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{
     type: 'driver' | 'rider';
-    startAddress: string;
-    startLat: string;
-    startLng: string;
-    destAddress: string;
-    destLat: string;
-    destLng: string;
+    startAddress?: string;
+    startLat?: string;
+    startLng?: string;
+    destAddress?: string;
+    destLat?: string;
+    destLng?: string;
     returnAction?: 'createRide' | 'searchRides';
+    // Schedule settings (for state restoration)
+    selectedDays?: string;
+    outboundTime?: string;
+    returnTime?: string;
+    timeWindow?: string;
+    autoSearch?: string;
+    scheduleType?: string;
   }>();
 
   const { loading, schedule, createOrUpdateSchedule } = useSchedule();
 
-  // Form state
-  const [selectedDays, setSelectedDays] = useState<DayOfWeek[]>([]);
-  const [outboundTime, setOutboundTime] = useState('08:00');
-  const [returnTime, setReturnTime] = useState('17:00');
-  const [timeWindow, setTimeWindow] = useState(30);
-  const [autoSearch, setAutoSearch] = useState(true);
+  // Location state - to persist during navigation
+// Location state - initialize from params first, then from schedule
+const [startAddress, setStartAddress] = useState(params.startAddress || '');
+const [startLat, setStartLat] = useState(params.startLat || '');
+const [startLng, setStartLng] = useState(params.startLng || '');
+const [destAddress, setDestAddress] = useState(params.destAddress || '');
+const [destLat, setDestLat] = useState(params.destLat || '');
+const [destLng, setDestLng] = useState(params.destLng || '');
+
+// Form state - initialize from params if available
+const [selectedDays, setSelectedDays] = useState<DayOfWeek[]>(() => {
+  if (params.selectedDays) {
+    try {
+      return JSON.parse(params.selectedDays as string);
+    } catch (e) {
+      return [];
+    }
+  }
+  return [];
+});
+const [outboundTime, setOutboundTime] = useState(params.outboundTime as string || '08:00');
+const [returnTime, setReturnTime] = useState(params.returnTime as string || '17:00');
+const [timeWindow, setTimeWindow] = useState(params.timeWindow ? parseInt(params.timeWindow as string) : 30);
+const [autoSearch, setAutoSearch] = useState(params.autoSearch ? params.autoSearch === 'true' : true);
   
   // Time picker state
   const [showTimePicker, setShowTimePicker] = useState(false);
@@ -59,6 +84,7 @@ export default function ScheduleScreen() {
   // Initialize with existing schedule
   useEffect(() => {
     if (schedule) {
+        console.log(schedule)
       setSelectedDays(schedule.outbound.daysOfWeek);
       setOutboundTime(schedule.outbound.departureTime);
       setTimeWindow(schedule.outbound.timeWindow);
@@ -67,8 +93,17 @@ export default function ScheduleScreen() {
       if (schedule.return) {
         setReturnTime(schedule.return.departureTime);
       }
+      
+      // Load addresses from schedule
+      setStartAddress(schedule.outbound.startLocation.address);
+      setStartLat(schedule.outbound.startLocation.lat.toString());
+      setStartLng(schedule.outbound.startLocation.lng.toString());
+      setDestAddress(schedule.outbound.endLocation.address);
+      setDestLat(schedule.outbound.endLocation.lat.toString());
+      setDestLng(schedule.outbound.endLocation.lng.toString());
     }
   }, [schedule]);
+
 
   const toggleDay = (day: DayOfWeek) => {
     if (selectedDays.includes(day)) {
@@ -107,6 +142,12 @@ export default function ScheduleScreen() {
   };
 
   const handleSave = async () => {
+    // Validation
+    if (!startAddress || !destAddress) {
+      Alert.alert('Addresses Required', 'Please select both pickup and drop-off locations');
+      return;
+    }
+
     if (selectedDays.length === 0) {
       Alert.alert('Select Days', 'Please select at least one day');
       return;
@@ -117,14 +158,14 @@ export default function ScheduleScreen() {
         type: params.type as 'driver' | 'rider',
         outbound: {
           startLocation: {
-            lat: parseFloat(params.startLat),
-            lng: parseFloat(params.startLng),
-            address: params.startAddress,
+            lat: parseFloat(startLat),
+            lng: parseFloat(startLng),
+            address: startAddress,
           },
           endLocation: {
-            lat: parseFloat(params.destLat),
-            lng: parseFloat(params.destLng),
-            address: params.destAddress,
+            lat: parseFloat(destLat),
+            lng: parseFloat(destLng),
+            address: destAddress,
           },
           departureTime: outboundTime,
           daysOfWeek: selectedDays,
@@ -132,18 +173,18 @@ export default function ScheduleScreen() {
         },
         return: {
           startLocation: {
-            lat: parseFloat(params.destLat),
-            lng: parseFloat(params.destLng),
-            address: params.destAddress,
+            lat: parseFloat(destLat),
+            lng: parseFloat(destLng),
+            address: destAddress,
           },
           endLocation: {
-            lat: parseFloat(params.startLat),
-            lng: parseFloat(params.startLng),
-            address: params.startAddress,
+            lat: parseFloat(startLat),
+            lng: parseFloat(startLng),
+            address: startAddress,
           },
           departureTime: returnTime,
-          daysOfWeek: selectedDays, // Same days
-          timeWindow: timeWindow, // Same window
+          daysOfWeek: selectedDays,
+          timeWindow: timeWindow,
         },
         active: true,
         autoSearch,
@@ -155,13 +196,19 @@ export default function ScheduleScreen() {
         Alert.alert(
           'Schedule Saved!',
           `Your schedule is set. Now ${returnAction === 'createRide' ? 'creating your ride' : 'searching for rides'}...`,
-          [{ text: 'Continue', onPress: () => router.back() }]
+          [{ 
+            text: 'Continue', 
+            onPress: () => router.replace('/(tabs)/home')
+          }]
         );
       } else {
         Alert.alert(
           'Schedule Saved!',
           `Your schedule has been saved.${autoSearch ? ' We\'ll automatically match you on these days.' : ''}`,
-          [{ text: 'Continue', onPress: () => router.back() }]
+          [{ 
+            text: 'Continue', 
+            onPress: () => router.replace('/(tabs)/home')
+          }]
         );
       }
     } catch (error) {
@@ -176,7 +223,10 @@ export default function ScheduleScreen() {
       'You can create one-time rides without a schedule.',
       [
         { text: 'Cancel', style: 'cancel' },
-        { text: 'Skip', onPress: () => router.back() },
+        { 
+          text: 'Skip', 
+          onPress: () => router.replace('/(tabs)/home')
+        },
       ]
     );
   };
@@ -208,27 +258,127 @@ export default function ScheduleScreen() {
           </View>
         </View>
 
-        {/* Route Card */}
-        <View style={styles.routeCard}>
-          <View style={styles.routeHeader}>
-            <Ionicons name="navigate" size={20} color="#2563eb" />
-            <Text style={styles.routeTitle}>Your Route</Text>
-          </View>
-          <View style={styles.routeDetails}>
-            <View style={styles.routePoint}>
-              <View style={[styles.routeDot, { backgroundColor: '#10b981' }]} />
-              <Text style={styles.routeAddress} numberOfLines={1}>
-                {params.startAddress}
+        {/* Schedule Type Selection - Simple */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Schedule Type</Text>
+          
+          <View style={styles.typeSelector}>
+            <TouchableOpacity
+              style={[
+                styles.typeButton,
+                params.type === 'driver' && styles.typeButtonActive,
+              ]}
+              onPress={() => router.setParams({ type: 'driver' })}
+            >
+              <Ionicons 
+                name="car" 
+                size={20} 
+                color={params.type === 'driver' ? '#fff' : '#2563eb'} 
+              />
+              <Text style={[
+                styles.typeButtonText,
+                params.type === 'driver' && styles.typeButtonTextActive,
+              ]}>
+                Offer Rides
               </Text>
-            </View>
-            <View style={styles.routeLine} />
-            <View style={styles.routePoint}>
-              <View style={[styles.routeDot, { backgroundColor: '#ef4444' }]} />
-              <Text style={styles.routeAddress} numberOfLines={1}>
-                {params.destAddress}
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                styles.typeButton,
+                params.type === 'rider' && styles.typeButtonActive,
+              ]}
+              onPress={() => router.setParams({ type: 'rider' })}
+            >
+              <Ionicons 
+                name="person" 
+                size={20} 
+                color={params.type === 'rider' ? '#fff' : '#10b981'} 
+              />
+              <Text style={[
+                styles.typeButtonText,
+                params.type === 'rider' && styles.typeButtonTextActive,
+              ]}>
+                Find Rides
               </Text>
-            </View>
+            </TouchableOpacity>
           </View>
+        </View>
+
+        {/* Route Selection */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Route</Text>
+          <Text style={styles.sectionSubtitle}>
+            Where do you travel?
+          </Text>
+
+          <TouchableOpacity
+            style={styles.locationInput}
+            onPress={() => router.replace({
+              pathname: '/address-selection',
+              params: { 
+                type: 'start',
+                returnTo: '/ride/schedule',
+                scheduleType: params.type || 'rider',
+                // Pass ALL current state
+                currentStartAddress: startAddress,
+                currentStartLat: startLat,
+                currentStartLng: startLng,
+                currentDestAddress: destAddress,
+                currentDestLat: destLat,
+                currentDestLng: destLng,
+                // Pass schedule settings to preserve them
+                selectedDays: JSON.stringify(selectedDays),
+                outboundTime,
+                returnTime,
+                timeWindow: timeWindow.toString(),
+                autoSearch: autoSearch.toString(),
+              },
+            })}
+          >
+            <View style={[styles.routeDot, { backgroundColor: '#10b981' }]} />
+            <Text style={[
+              styles.routeAddress,
+              !startAddress && styles.routeAddressPlaceholder
+            ]}>
+              {startAddress || 'Select pickup location'}
+            </Text>
+            <Ionicons name="chevron-forward" size={20} color="#9ca3af" />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.locationInput}
+            onPress={() => router.replace({
+              pathname: '/address-selection',
+              params: { 
+                type: 'dest',
+                returnTo: '/ride/schedule',
+                scheduleType: params.type || 'rider',
+                // Pass ALL current state
+                currentStartAddress: startAddress,
+                currentStartLat: startLat,
+                currentStartLng: startLng,
+                currentDestAddress: destAddress,
+                currentDestLat: destLat,
+                currentDestLng: destLng,
+                // Pass schedule settings to preserve them
+                selectedDays: JSON.stringify(selectedDays),
+                outboundTime,
+                returnTime,
+                timeWindow: timeWindow.toString(),
+                autoSearch: autoSearch.toString(),
+              },
+            })}
+          >
+            <View style={[styles.routeDot, { backgroundColor: '#ef4444' }]} />
+            <Text style={[
+              styles.routeAddress,
+              !destAddress && styles.routeAddressPlaceholder
+            ]}>
+              {destAddress || 'Select drop-off location'}
+            </Text>
+            <Ionicons name="chevron-forward" size={20} color="#9ca3af" />
+          </TouchableOpacity>
         </View>
 
         {/* Day Selection */}
@@ -368,7 +518,7 @@ export default function ScheduleScreen() {
         </View>
 
         {/* Preview */}
-        {selectedDays.length > 0 && (
+        {selectedDays.length > 0 && startAddress && destAddress && (
           <View style={styles.previewSection}>
             <Text style={styles.previewTitle}>Schedule Preview</Text>
             <View style={styles.previewCard}>
@@ -403,9 +553,9 @@ export default function ScheduleScreen() {
       {/* Footer */}
       <View style={styles.footer}>
         <TouchableOpacity
-          style={[styles.saveButton, (loading || selectedDays.length === 0) && styles.saveButtonDisabled]}
+          style={[styles.saveButton, (loading || selectedDays.length === 0 || !startAddress || !destAddress) && styles.saveButtonDisabled]}
           onPress={handleSave}
-          disabled={loading || selectedDays.length === 0}
+          disabled={loading || selectedDays.length === 0 || !startAddress || !destAddress}
         >
           {loading ? (
             <ActivityIndicator color="#fff" />
@@ -462,6 +612,7 @@ export default function ScheduleScreen() {
     </SafeAreaView>
   );
 }
+
 
 const styles = StyleSheet.create({
   container: {
@@ -595,14 +746,15 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#111827',
   },
-  daysGrid: {
+    daysGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 8,
+    gap: 10,
     marginBottom: 12,
-  },
-  dayButton: {
-    width: '13%',
+    },
+    dayButton: {
+    width: '13.5%',  // Changed from 13%
+    minWidth: 46,     // Added minimum width
     aspectRatio: 1,
     justifyContent: 'center',
     alignItems: 'center',
@@ -610,7 +762,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 2,
     borderColor: '#d1d5db',
-  },
+    },
   dayButtonActive: {
     backgroundColor: '#2563eb',
     borderColor: '#2563eb',
@@ -787,4 +939,89 @@ const styles = StyleSheet.create({
   timePicker: {
     height: 200,
   },
+  locationInput: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  padding: 16,
+  backgroundColor: '#f9fafb',
+  borderRadius: 12,
+  borderWidth: 1,
+  borderColor: '#d1d5db',
+  marginBottom: 12,
+  gap: 12,
+},
+routeAddressPlaceholder: {
+  color: '#9ca3af',
+  fontStyle: 'italic',
+},
+typeCard: {
+  flex: 1,
+  padding: 20,
+  borderRadius: 16,
+  borderWidth: 2,
+  borderColor: '#d1d5db',
+  backgroundColor: '#fff',
+  alignItems: 'center',
+},
+typeCardActive: {
+  borderColor: '#2563eb',
+  backgroundColor: '#eff6ff',
+},
+typeIconContainer: {
+  width: 64,
+  height: 64,
+  borderRadius: 32,
+  backgroundColor: '#eff6ff',
+  justifyContent: 'center',
+  alignItems: 'center',
+  marginBottom: 12,
+},
+typeIconContainerActive: {
+  backgroundColor: '#2563eb',
+},
+typeTitle: {
+  fontSize: 16,
+  fontWeight: 'bold',
+  color: '#111827',
+  marginBottom: 4,
+},
+typeTitleActive: {
+  color: '#2563eb',
+},
+typeDescription: {
+  fontSize: 13,
+  color: '#6b7280',
+  textAlign: 'center',
+},
+typeDescriptionActive: {
+  color: '#1e40af',
+},
+typeSelector: {
+  flexDirection: 'row',
+  gap: 12,
+},
+typeButton: {
+  flex: 1,
+  flexDirection: 'row',
+  alignItems: 'center',
+  justifyContent: 'center',
+  padding: 16,
+  borderRadius: 12,
+  borderWidth: 2,
+  borderColor: '#d1d5db',
+  backgroundColor: '#fff',
+  gap: 8,
+},
+typeButtonActive: {
+  borderColor: '#2563eb',
+  backgroundColor: '#2563eb',
+},
+typeButtonText: {
+  fontSize: 16,
+  fontWeight: '600',
+  color: '#6b7280',
+},
+typeButtonTextActive: {
+  color: '#fff',
+},
 });

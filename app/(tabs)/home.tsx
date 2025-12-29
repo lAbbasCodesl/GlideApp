@@ -16,6 +16,7 @@ import { calculateRidePrice, canUseRideFeatures } from '../../types/user';
 import { useSchedule } from '../../hooks/useSchedule';
 import { useRide } from '../../hooks/useRide';
 import { RideSearch, isSearchActive, formatTimeWindow } from '../../types/rideSearch';
+import { cancelRideSearch, getTodaysRideSearches } from '../../services/rideSearchService';
 
 export default function HomeScreen() {
   const { user,userProfile,refreshUserProfile } = useAuth();

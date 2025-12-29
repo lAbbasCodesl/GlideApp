@@ -66,7 +66,7 @@ export default function MyScheduleScreen() {
             try {
               await deleteSchedule();
               Alert.alert('Schedule Deleted', '', [
-                { text: 'OK', onPress: () => router.back() },
+                { text: 'OK' },
               ]);
             } catch (error) {
               Alert.alert('Error', 'Failed to delete schedule');
